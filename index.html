@@ -191,6 +191,11 @@ $("#readBtn").onclick=()=>{
  const words=countWords(t),sent=Math.max(1,(t.match(/[.!?]+/g)||[]).length),chars=t.length,avg=words/sent,syll=(t.toLowerCase().match(/[aeiouy]+/g)||[]).length,score=Math.max(0,Math.min(100,206.835-1.015*avg-84.6*(syll/Math.max(1,words)))),level=score>=90?"Very easy":score>=80?"Easy":score>=70?"Fairly easy":score>=60?"Standard":score>=50?"Fairly difficult":score>=30?"Difficult":"Very difficult";
  $("#readResults").innerHTML=`<div class="scoregrid"><div class="metric"><small>Reading score</small><strong>${score.toFixed(0)}/100</strong></div><div class="metric"><small>Estimated difficulty</small><strong>${level}</strong></div><div class="metric"><small>Words / sentence</small><strong>${avg.toFixed(1)}</strong></div></div><div class="notice">${words.toLocaleString()} words • ${sent} sentences • ${chars.toLocaleString()} characters. Readability scores are estimates, not absolute measures.</div>`;
 };
+$("#readClear").onclick=()=>{
+    $("#readInput").value="";
+    $("#readResults").innerHTML="";
+    $("#readCount").textContent="0 words • 0 characters";
+};
 
 $$("[data-action]").forEach(b=>b.onclick=async()=>{const t=$("#writeInput"),a=b.dataset.action;if(a==="upper")t.value=t.value.toUpperCase();if(a==="lower")t.value=t.value.toLowerCase();if(a==="clean")t.value=t.value.replace(/\s+/g," ").trim();if(a==="copy"){await navigator.clipboard.writeText(t.value);status($("#writeStatus"),"✓ Copied to clipboard.");return}if(a==="clear")t.value="";if(a==="count")status($("#writeStatus"),`Words: ${countWords(t.value).toLocaleString()} • Characters: ${t.value.length.toLocaleString()} • Sentences: ${(t.value.match(/[.!?]+/g)||[]).length}`);t.dispatchEvent(new Event("input"))});
 </script>
