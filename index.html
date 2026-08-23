@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="DPT-Detector — plagiarism checking, natural rewriting, readability analysis and writing tools.">
+<meta name="author" content="Dhanush">
+<title>DPT-Detector — Writing Intelligence</title>
+<style>
+:root{--bg:#060a12;--surface:#0c1220;--surface2:#101a2b;--line:#1e2d43;--text:#f4f8ff;--muted:#91a4bb;--cyan:#58e6ff;--blue:#6d8cff;--green:#36d399;--yellow:#f4c95d;--red:#fb7185;--shadow:0 24px 80px #0007}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(900px 500px at 50% -150px,#182957 0%,transparent 68%),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}
+a{color:inherit}.container{width:min(1160px,92%);margin:auto}.topbar{height:76px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ffffff08}.logo{display:flex;gap:10px;align-items:center;text-decoration:none;font-weight:900;letter-spacing:-.4px}.logo-mark{width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,var(--cyan),var(--blue));display:grid;place-items:center;color:#061018;box-shadow:0 8px 30px #58e6ff22}.logo small{display:block;color:var(--muted);font-size:.66rem;font-weight:600;letter-spacing:.8px}.nav{display:flex;gap:24px;color:var(--muted);font-size:.9rem}.nav a{text-decoration:none}.hero{padding:72px 0 48px;text-align:center}.eyebrow{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid #29415d;background:#0b1525;border-radius:999px;color:#b9d8ef;font-size:.78rem;font-weight:800}.dot{width:7px;height:7px;background:var(--green);border-radius:50%;box-shadow:0 0 14px var(--green)}h1{font-size:clamp(2.7rem,7vw,5.4rem);line-height:.95;letter-spacing:-.065em;margin:22px 0 20px}.grad{background:linear-gradient(90deg,var(--cyan),#fff 45%,#9b8cff);-webkit-background-clip:text;background-clip:text;color:transparent}.hero p{max-width:730px;margin:auto;color:var(--muted);font-size:1.05rem}.app{display:grid;grid-template-columns:250px 1fr;gap:18px;align-items:start}.sidebar{position:sticky;top:18px;background:rgba(12,18,32,.85);border:1px solid var(--line);border-radius:20px;padding:10px;backdrop-filter:blur(18px)}.sidebtn{width:100%;display:flex;gap:12px;align-items:center;text-align:left;border:1px solid transparent;background:transparent;color:var(--muted);padding:14px;border-radius:14px;cursor:pointer;font:inherit}.sidebtn.active{background:#122139;border-color:#25425e;color:var(--text);box-shadow:inset 0 0 0 1px #ffffff05}.sidebtn b{display:block;font-size:.9rem}.sidebtn span{font-size:.78rem;color:inherit;opacity:.7}.icon{font-size:1.15rem;width:26px;text-align:center}.panel{background:linear-gradient(145deg,#0d1524,#09101c);border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow);overflow:hidden}.panel-head{padding:24px 26px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.panel-head h2{margin:0;font-size:1.25rem}.panel-head p{margin:5px 0 0;color:var(--muted);font-size:.9rem}.limit{white-space:nowrap;padding:7px 10px;background:#111f33;border:1px solid #243a55;border-radius:10px;color:#a9c9e4;font-size:.75rem;font-weight:800}.editor{padding:22px 26px 26px}.textarea-wrap{position:relative}.editor textarea{width:100%;min-height:310px;resize:vertical;background:#070c15;border:1px solid #22354e;border-radius:17px;color:var(--text);padding:19px;font:inherit;line-height:1.7;outline:none}.editor textarea:focus{border-color:#3e7791;box-shadow:0 0 0 4px #58e6ff0a}.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:11px;color:var(--muted);font-size:.82rem}.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:17px}.btn{border:0;border-radius:12px;padding:12px 17px;cursor:pointer;font-weight:850;font:inherit}.primary{background:linear-gradient(135deg,var(--cyan),#7ea2ff);color:#061018}.secondary{background:#152238;border:1px solid #29415d;color:#d9e8f6}.status{display:none;margin-top:16px;border:1px solid #29415d;background:#0b1524;border-radius:15px;padding:14px;color:#b9cce0}.status.show{display:block}.spinner{display:inline-block;width:14px;height:14px;border:2px solid #31506b;border-top-color:var(--cyan);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:7px}@keyframes spin{to{transform:rotate(360deg)}}.results{display:none;border-top:1px solid var(--line);padding:24px 26px;background:#09111e}.results.show{display:block}.scoregrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.metric{border:1px solid var(--line);background:#0d1727;border-radius:16px;padding:17px}.metric small{color:var(--muted)}.metric strong{display:block;font-size:1.8rem;margin-top:4px}.meter{height:9px;background:#1a2637;border-radius:99px;overflow:hidden;margin-top:12px}.meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--yellow),var(--red));transition:width .6s}.sources{margin-top:18px;display:grid;gap:9px}.source{display:flex;justify-content:space-between;gap:16px;align-items:center;border:1px solid var(--line);background:#0d1727;padding:13px 15px;border-radius:13px}.source a{color:#aeeeff;text-decoration:none;font-weight:750}.source small{color:var(--muted)}.notice{margin-top:18px;color:#9fb2c8;font-size:.78rem}.rewrite-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.rewrite-grid textarea{min-height:300px}.select{background:#101c2e;border:1px solid #263d58;color:var(--text);border-radius:10px;padding:9px}.toolcards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.mini{border:1px solid var(--line);background:#0d1727;border-radius:15px;padding:16px}.mini b{display:block}.mini span{display:block;color:var(--muted);margin-top:5px;font-size:.82rem}.about{padding:70px 0}.about-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px}.about-card{border:1px solid var(--line);background:#0b1320;border-radius:20px;padding:25px}.about-card p,.about-card li{color:var(--muted)}footer{border-top:1px solid var(--line);margin-top:25px;padding:38px 0 44px}.footgrid{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:30px}.foot-title{font-weight:900}.footmuted{color:var(--muted);font-size:.85rem;margin-top:8px}.footlinks{display:grid;gap:8px;color:var(--muted);font-size:.85rem}.footlinks a{text-decoration:none}.copyright{margin-top:30px;padding-top:20px;border-top:1px solid #ffffff08;color:#64778d;font-size:.76rem;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.hidden{display:none!important}.error{color:#ffb1bc}.good{color:#73efb4}
+@media(max-width:900px){.app{grid-template-columns:1fr}.sidebar{position:static;display:grid;grid-template-columns:1fr 1fr;gap:6px}.about-grid{grid-template-columns:1fr}.footgrid{grid-template-columns:1fr 1fr}}
+@media(max-width:650px){.nav{display:none}.hero{padding:48px 0 34px}.app{width:100%}.sidebar{grid-template-columns:1fr}.panel-head,.editor,.results{padding-left:17px;padding-right:17px}.scoregrid,.rewrite-grid,.toolcards{grid-template-columns:1fr}.panel-head{align-items:flex-start}.limit{display:none}h1{font-size:3rem}.editor textarea{min-height:250px}.footgrid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="container topbar">
+  <a class="logo" href="#">
+    <span class="logo-mark">D</span>
+    <span>DPT-Detector<small>WRITING INTELLIGENCE</small></span>
+  </a>
+  <nav class="nav"><a href="#workspace">Workspace</a><a href="#about">About</a><a href="#contact">Contact</a></nav>
+</header>
+
+<main class="container">
+<section class="hero">
+  <div class="eyebrow"><span class="dot"></span> MAXIMUM 5,000 WORDS PER REQUEST</div>
+  <h1>Write with confidence.<br><span class="grad">Know your content.</span></h1>
+  <p>Plagiarism detection, natural rewriting, readability insights and practical writing tools — designed in one focused workspace.</p>
+</section>
+
+<section id="workspace" class="app">
+  <aside class="sidebar">
+    <button class="sidebtn active" data-tool="plag"><span class="icon">🔍</span><span><b>Plagiarism Check</b><span>Web & academic matches</span></span></button>
+    <button class="sidebtn" data-tool="rewrite"><span class="icon">✍️</span><span><b>Rewrite Naturally</b><span>Clearer, smoother writing</span></span></button>
+    <button class="sidebtn" data-tool="read"><span class="icon">📊</span><span><b>Readability</b><span>Understand your text</span></span></button>
+    <button class="sidebtn" data-tool="write"><span class="icon">📝</span><span><b>Writing Tools</b><span>Quick utilities</span></span></button>
+  </aside>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div><h2 id="title">🔍 Plagiarism Check</h2><p id="desc">Search your submitted text against a professional plagiarism-detection database.</p></div>
+      <span class="limit">5,000 WORDS</span>
+    </div>
+
+    <div id="plagView">
+      <div class="editor">
+        <textarea id="plagText" maxlength="60000" placeholder="Paste your essay, article, assignment or other text here..."></textarea>
+        <div class="toolbar"><span id="plagCount">0 words • 0 characters</span><span>Results include detected web matches returned by the connected service.</span></div>
+        <div class="actions"><button class="btn primary" id="plagBtn">🔍 Check for plagiarism</button><button class="btn secondary" id="plagClear">Clear</button></div>
+        <div class="status" id="plagStatus"></div>
+      </div>
+      <div class="results" id="plagResults"></div>
+    </div>
+
+    <div id="rewriteView" class="hidden">
+      <div class="editor">
+        <div class="rewrite-grid">
+          <textarea id="rewriteInput" maxlength="60000" placeholder="Paste the text you want to improve..."></textarea>
+          <textarea id="rewriteOutput" placeholder="Your rewritten text will appear here..." readonly></textarea>
+        </div>
+        <div class="toolbar"><span id="rewriteCount">0 words • 0 characters</span><label>Style <select id="style" class="select"><option>Natural</option><option>Academic</option><option>Professional</option><option>Simple</option><option>Conversational</option></select></label></div>
+        <div class="actions"><button class="btn primary" id="rewriteBtn">✍️ Rewrite naturally</button><button class="btn secondary" id="copyRewrite">Copy result</button><button class="btn secondary" id="rewriteClear">Clear</button></div>
+        <div class="status" id="rewriteStatus"></div>
+      </div>
+    </div>
+
+    <div id="readView" class="hidden">
+      <div class="editor">
+        <textarea id="readInput" maxlength="60000" placeholder="Paste text to analyze its readability..."></textarea>
+        <div class="toolbar"><span id="readCount">0 words • 0 characters</span></div>
+        <div class="actions"><button class="btn primary" id="readBtn">📊 Analyze readability</button><button class="btn secondary" id="readClear">Clear</button></div>
+        <div class="results show" id="readResults"></div>
+      </div>
+    </div>
+
+    <div id="writeView" class="hidden">
+      <div class="editor">
+        <textarea id="writeInput" maxlength="60000" placeholder="Paste text and choose a quick tool below..."></textarea>
+        <div class="toolbar"><span id="writeCount">0 words • 0 characters</span></div>
+        <div class="toolcards" style="margin-top:15px">
+          <button class="mini secondary" data-action="upper"><b>UPPERCASE</b><span>Convert all text</span></button>
+          <button class="mini secondary" data-action="lower"><b>lowercase</b><span>Convert all text</span></button>
+          <button class="mini secondary" data-action="clean"><b>Clean spacing</b><span>Remove extra spaces</span></button>
+          <button class="mini secondary" data-action="count"><b>Word statistics</b><span>Words, sentences & characters</span></button>
+          <button class="mini secondary" data-action="copy"><b>Copy text</b><span>Copy to clipboard</span></button>
+          <button class="mini secondary" data-action="clear"><b>Clear</b><span>Start again</span></button>
+        </div>
+        <div class="status" id="writeStatus"></div>
+      </div>
+    </div>
+  </section>
+</section>
+
+<section id="about" class="about">
+  <div class="about-grid">
+    <article class="about-card"><h2>Built for better writing</h2><p>DPT-Detector brings the everyday checks writers and students need into a single, distraction-free workspace.</p><ul><li>Maximum 5,000 words per request</li><li>Real plagiarism scanning through a connected service</li><li>AI-powered rewriting through a secure backend</li><li>Fast local readability and writing utilities</li></ul></article>
+    <article class="about-card"><h2>Important</h2><p>Similarity results are evidence of matching content, not a legal or academic verdict by themselves. Always review the sources and cite material appropriately.</p><p>The Rewrite tool improves clarity and natural flow; it is not presented as a way to evade academic integrity systems or AI detectors.</p></article>
+  </div>
+</section>
+</main>
+
+<footer id="contact">
+  <div class="container">
+    <div class="footgrid">
+      <div><div class="logo"><span class="logo-mark">D</span><span>DPT-Detector<small>WRITING INTELLIGENCE</small></span></div><div class="footmuted">A writing and originality toolkit created by Dhanush.</div></div>
+      <div><strong>Creator</strong><div class="footlinks" style="margin-top:10px"><span>Dhanush</span><a href="tel:+94773991409">+94 77 399 1409</a><a href="mailto:shridhanush1429@gmail.com">shridhanush1429@gmail.com</a></div></div>
+      <div><strong>Connect</strong><div class="footlinks" style="margin-top:10px"><a href="https://github.com/Dhanush-dpt1429" target="_blank" rel="noopener">GitHub Profile ↗</a><a href="https://github.com/Dhanush-dpt1429" target="_blank" rel="noopener">GitHub Projects ↗</a></div></div>
+    </div>
+    <div class="copyright"><span>© 2026 DPT-Detector. All rights reserved.</span><span>Created by Dhanush</span></div>
+  </div>
+</footer>
+
+<script>
+const API_BASE = window.DPT_API_BASE || "http://localhost:8787";
+const LIMIT=5000;
+const $=s=>document.querySelector(s);
+const $$=s=>document.querySelectorAll(s);
+const countWords=t=>(t.trim().match(/\S+/g)||[]).length;
+function bindCounter(id,out){const el=$(id);const fn=()=>{let n=countWords(el.value);out.textContent=`${n.toLocaleString()} words • ${el.value.length.toLocaleString()} characters`;if(n>LIMIT){el.value=el.value.trim().split(/\s+/).slice(0,LIMIT).join(" ");fn()}};el.addEventListener("input",fn);fn()}
+bindCounter("#plagText",$("#plagCount"));bindCounter("#rewriteInput",$("#rewriteCount"));bindCounter("#readInput",$("#readCount"));bindCounter("#writeInput",$("#writeCount"));
+
+const views={plag:$("#plagView"),rewrite:$("#rewriteView"),read:$("#readView"),write:$("#writeView")};
+const meta={
+plag:["🔍 Plagiarism Check","Search your submitted text against a professional plagiarism-detection database."],
+rewrite:["✍️ Rewrite Naturally","Improve clarity, flow and tone while preserving the original meaning."],
+read:["📊 Readability","Measure reading difficulty, sentence length and vocabulary density."],
+write:["📝 Writing Tools","Quick utilities for cleaning, transforming and understanding your text."]
+};
+$$(".sidebtn").forEach(btn=>btn.onclick=()=>{let type=btn.dataset.tool;$$(".sidebtn").forEach(x=>x.classList.remove("active"));btn.classList.add("active");Object.entries(views).forEach(([k,v])=>v.classList.toggle("hidden",k!==type));$("#title").textContent=meta[type][0];$("#desc").textContent=meta[type][1]});
+
+function status(el,msg,err=false){el.classList.add("show");el.innerHTML=err?`<span class="error">⚠ ${msg}</span>`:`<span>${msg}</span>`}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+
+$("#plagBtn").onclick=async()=>{
+ const text=$("#plagText").value.trim(), st=$("#plagStatus");
+ if(!text)return status(st,"Paste some text first.",true);
+ if(countWords(text)>LIMIT)return status(st,"The 5,000-word limit has been reached.",true);
+ status(st,'<span class="spinner"></span>Submitting your text for a web plagiarism scan…');
+ $("#plagBtn").disabled=true;
+ try{
+   const r=await fetch(API_BASE+"/api/plagiarism",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});
+   const d=await r.json();if(!r.ok)throw new Error(d.error||"Could not start scan.");
+   status(st,'<span class="spinner"></span>Scan submitted. Searching sources…');
+   let done=false;
+   for(let i=0;i<60;i++){
+     await new Promise(x=>setTimeout(x,2500));
+     const q=await fetch(API_BASE+"/api/plagiarism/"+encodeURIComponent(d.scanId));const data=await q.json();
+     if(data.status==="completed"){done=true;renderPlag(data);break}
+     if(data.status==="error")throw new Error(data.error||"The plagiarism scan failed.");
+     status(st,`<span class="spinner"></span>Scanning… ${Math.min(98,Math.round((i+1)/60*100))}%`);
+   }
+   if(!done)throw new Error("The scan is taking longer than expected. Please try again.");
+ }catch(e){status(st,e.message,true)}
+ finally{$("#plagBtn").disabled=false}
+};
+
+function renderPlag(d){
+ const r=d.results||{}, score=Number(r.score?.aggregatedScore||0), original=Math.max(0,100-score);
+ const sources=(r.internet||[]).slice(0,20);
+ $("#plagResults").classList.add("show");
+ $("#plagResults").innerHTML=`
+ <div class="scoregrid">
+  <div class="metric"><small>Originality</small><strong class="good">${original.toFixed(1)}%</strong><div class="meter"><i style="width:${original}%"></i></div></div>
+  <div class="metric"><small>Similarity</small><strong>${score.toFixed(1)}%</strong><div class="meter"><i style="width:${score}%"></i></div></div>
+  <div class="metric"><small>Matched words</small><strong>${Number((r.score?.identicalWords||0)+(r.score?.minorChangedWords||0)+(r.score?.relatedMeaningWords||0)).toLocaleString()}</strong></div>
+ </div>
+ <div class="sources"><h3>${sources.length?"Detected sources":"No web matches returned"}</h3>
+ ${sources.map(s=>`<div class="source"><div><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title||s.url||"Source")}</a><br><small>${Number(s.matchedWords||0).toLocaleString()} matched words</small></div><span class="pill">${esc(s.url||"")}</span></div>`).join("")}</div>
+ <div class="notice">Powered by the connected plagiarism service. Matching and paraphrased content can be detected where supported. Review every source before making an academic or legal conclusion.</div>`;
+ status($("#plagStatus"),"✓ Scan completed successfully.");
+}
+
+$("#plagClear").onclick=()=>{$("#plagText").value="";$("#plagResults").classList.remove("show");$("#plagStatus").classList.remove("show");$("#plagCount").textContent="0 words • 0 characters"};
+
+$("#rewriteBtn").onclick=async()=>{
+ const text=$("#rewriteInput").value.trim(),st=$("#rewriteStatus");
+ if(!text)return status(st,"Paste some text first.",true);
+ if(countWords(text)>LIMIT)return status(st,"The 5,000-word limit has been reached.",true);
+ status(st,'<span class="spinner"></span>Rewriting your text…');$("#rewriteBtn").disabled=true;
+ try{const r=await fetch(API_BASE+"/api/rewrite",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,style:$("#style").value})});const d=await r.json();if(!r.ok)throw new Error(d.error||"Rewrite failed.");$("#rewriteOutput").value=d.text;status(st,"✓ Rewrite completed.");}
+ catch(e){status(st,e.message,true)}finally{$("#rewriteBtn").disabled=false}
+};
+$("#copyRewrite").onclick=async()=>{await navigator.clipboard.writeText($("#rewriteOutput").value);status($("#rewriteStatus"),"✓ Copied to clipboard.")};
+$("#rewriteClear").onclick=()=>{$("#rewriteInput").value="";$("#rewriteOutput").value="";$("#rewriteStatus").classList.remove("show");$("#rewriteCount").textContent="0 words • 0 characters"};
+
+$("#readBtn").onclick=()=>{
+ const t=$("#readInput").value.trim();if(!t){$("#readResults").innerHTML='<p class="error">Paste some text first.</p>';return}
+ const words=countWords(t),sent=Math.max(1,(t.match(/[.!?]+/g)||[]).length),chars=t.length,avg=words/sent,syll=(t.toLowerCase().match(/[aeiouy]+/g)||[]).length,score=Math.max(0,Math.min(100,206.835-1.015*avg-84.6*(syll/Math.max(1,words)))),level=score>=90?"Very easy":score>=80?"Easy":score>=70?"Fairly easy":score>=60?"Standard":score>=50?"Fairly difficult":score>=30?"Difficult":"Very difficult";
+ $("#readResults").innerHTML=`<div class="scoregrid"><div class="metric"><small>Reading score</small><strong>${score.toFixed(0)}/100</strong></div><div class="metric"><small>Estimated difficulty</small><strong>${level}</strong></div><div class="metric"><small>Words / sentence</small><strong>${avg.toFixed(1)}</strong></div></div><div class="notice">${words.toLocaleString()} words • ${sent} sentences • ${chars.toLocaleString()} characters. Readability scores are estimates, not absolute measures.</div>`;
+};
+
+$$("[data-action]").forEach(b=>b.onclick=async()=>{const t=$("#writeInput"),a=b.dataset.action;if(a==="upper")t.value=t.value.toUpperCase();if(a==="lower")t.value=t.value.toLowerCase();if(a==="clean")t.value=t.value.replace(/\s+/g," ").trim();if(a==="copy"){await navigator.clipboard.writeText(t.value);status($("#writeStatus"),"✓ Copied to clipboard.");return}if(a==="clear")t.value="";if(a==="count")status($("#writeStatus"),`Words: ${countWords(t.value).toLocaleString()} • Characters: ${t.value.length.toLocaleString()} • Sentences: ${(t.value.match(/[.!?]+/g)||[]).length}`);t.dispatchEvent(new Event("input"))});
+</script>
+</body>
+</html>
