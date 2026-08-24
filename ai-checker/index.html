@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>AI Content Checker | DPT-Detector</title>
+
+<meta name="description"
+content="Analyze writing with DPT-Detector's AI content checker and review the available analysis.">
+
+<link rel="canonical"
+href="https://dhanush-dpt1429.github.io/DPT-Detector/ai-checker/">
+
+</head>
+
+<body>
+
+<h1>AI Content Checker</h1>
+
+<p>
+Analyze text and review the available writing analysis.
+</p>
+
+<textarea
+id="text"
+placeholder="Paste text here..."
+></textarea>
+
+<button onclick="checkText()">
+🤖 Check Text
+</button>
+
+<div id="result"></div>
+
+<script>
+
+function checkText(){
+
+if(!text.value.trim()){
+result.textContent=
+"Please paste some text first.";
+return;
+}
+
+result.innerHTML=`
+<p>
+The AI analysis feature is being prepared.
+</p>
+`;
+
+}
+
+</script>
+
+</body>
+</html>
