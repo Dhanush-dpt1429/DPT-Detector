@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>Free Readability Checker Online | DPT-Detector</title>
+
+<meta name="description"
+content="Analyze your writing with DPT-Detector's free readability checker. Measure words, sentences, average sentence length and reading difficulty.">
+
+<link rel="canonical"
+href="https://dhanush-dpt1429.github.io/DPT-Detector/readability-checker/">
+
+</head>
+
+<body>
+
+<h1>Free Readability Checker</h1>
+
+<p>
+Analyze your writing and understand its readability,
+sentence structure and vocabulary.
+</p>
+
+<textarea
+id="text"
+placeholder="Paste your text here..."
+></textarea>
+
+<button onclick="analyze()">
+📊 Analyze readability
+</button>
+
+<div id="results"></div>
+
+<script>
+
+function analyze(){
+
+const text=
+document.getElementById("text").value.trim();
+
+if(!text){
+results.innerHTML=
+"<p>Please paste some text first.</p>";
+return;
+}
+
+const words=
+(text.match(/\S+/g)||[]).length;
+
+const sentences=
+(text.match(/[.!?]+/g)||[]).length||1;
+
+const characters=text.length;
+
+const avg=
+(words/sentences).toFixed(1);
+
+results.innerHTML=`
+
+<h2>Readability Results</h2>
+
+<p><strong>Words:</strong> ${words}</p>
+
+<p><strong>Characters:</strong> ${characters}</p>
+
+<p><strong>Sentences:</strong> ${sentences}</p>
+
+<p><strong>Average words per sentence:</strong> ${avg}</p>
+
+`;
+
+}
+
+</script>
+
+</body>
+</html>
