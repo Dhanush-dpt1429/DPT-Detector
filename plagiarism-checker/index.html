@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>Free Plagiarism Checker Online | DPT-Detector</title>
+
+<meta name="description"
+content="Check your text for potential plagiarism with DPT-Detector. Scan essays, assignments and articles and review detected matching sources.">
+
+<link rel="canonical"
+href="https://YOUR-DOMAIN.com/plagiarism-checker/">
+
+<style>
+body{
+  margin:0;
+  background:#060a12;
+  color:#f4f8ff;
+  font-family:system-ui,-apple-system,Segoe UI,sans-serif;
+}
+
+.container{
+  width:min(900px,92%);
+  margin:auto;
+}
+
+header{
+  padding:22px 0;
+  border-bottom:1px solid #1e2d43;
+}
+
+header a{
+  color:#f4f8ff;
+  text-decoration:none;
+  font-weight:900;
+  font-size:1.2rem;
+}
+
+main{
+  padding:60px 0;
+}
+
+h1{
+  font-size:clamp(2.5rem,7vw,4.5rem);
+  line-height:1;
+}
+
+h2{
+  margin-top:45px;
+}
+
+p,li{
+  color:#91a4bb;
+  line-height:1.8;
+}
+
+textarea{
+  width:100%;
+  min-height:300px;
+  box-sizing:border-box;
+  background:#070c15;
+  color:#fff;
+  border:1px solid #22354e;
+  border-radius:15px;
+  padding:18px;
+  font:inherit;
+  resize:vertical;
+}
+
+button{
+  margin-top:15px;
+  padding:13px 20px;
+  border:0;
+  border-radius:12px;
+  background:#58e6ff;
+  color:#061018;
+  font-weight:800;
+  cursor:pointer;
+}
+
+#status{
+  margin-top:15px;
+  color:#91a4bb;
+}
+
+footer{
+  padding:40px 0;
+  border-top:1px solid #1e2d43;
+  color:#64778d;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+<div class="container">
+<a href="/">DPT-Detector</a>
+</div>
+</header>
+
+<main class="container">
+
+<h1>Free Plagiarism Checker</h1>
+
+<p>
+Check your essay, assignment, article or other writing for
+potentially matching content with DPT-Detector.
+</p>
+
+<textarea
+id="text"
+maxlength="60000"
+placeholder="Paste your text here..."
+></textarea>
+
+<div id="count">0 words</div>
+
+<button id="check">🔍 Check for plagiarism</button>
+
+<div id="status"></div>
+
+<section>
+
+<h2>How does a plagiarism checker work?</h2>
+
+<p>
+A plagiarism checker compares submitted writing against
+available sources and identifies potentially matching content.
+The detected sources should always be reviewed before making
+academic or legal conclusions.
+</p>
+
+<h2>How to use DPT-Detector</h2>
+
+<ol>
+<li>Paste your text into the checker.</li>
+<li>Click the plagiarism check button.</li>
+<li>Wait for the scan to complete.</li>
+<li>Review the detected sources.</li>
+</ol>
+
+<h2>Frequently Asked Questions</h2>
+
+<h3>What is plagiarism?</h3>
+
+<p>
+Plagiarism is presenting another person's words or ideas as
+your own without appropriate acknowledgement.
+</p>
+
+<h3>Does a similarity score prove plagiarism?</h3>
+
+<p>
+No. A similarity score indicates potentially matching content.
+The sources and context should always be reviewed.
+</p>
+
+</section>
+
+</main>
+
+<footer>
+<div class="container">
+© 2026 DPT-Detector
+</div>
+</footer>
+
+<script>
+const API_BASE="https://dpt-detector.vercel.app";
+const LIMIT=5000;
+
+const text=document.getElementById("text");
+const count=document.getElementById("count");
+const status=document.getElementById("status");
+const check=document.getElementById("check");
+
+function words(value){
+  return (value.trim().match(/\S+/g)||[]).length;
+}
+
+text.addEventListener("input",()=>{
+  count.textContent=
+    words(text.value).toLocaleString()+" words • "+
+    text.value.length.toLocaleString()+" characters";
+});
+
+check.onclick=async()=>{
+
+  const value=text.value.trim();
+
+  if(!value){
+    status.textContent="Please paste some text first.";
+    return;
+  }
+
+  if(words(value)>LIMIT){
+    status.textContent="Maximum 5,000 words.";
+    return;
+  }
+
+  check.disabled=true;
+  status.textContent="Submitting plagiarism scan...";
+
+  try{
+
+    const response=await fetch(
+      API_BASE+"/api/plagiarism",
+      {
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json"
+        },
+        body:JSON.stringify({text:value})
+      }
+    );
+
+    const data=await response.json();
+
+    if(!response.ok){
+      throw new Error(
+        data.error||"Could not start plagiarism scan."
+      );
+    }
+
+    status.textContent=
+      "Scan submitted. Please wait for the results...";
+
+    for(let i=0;i<60;i++){
+
+      await new Promise(
+        resolve=>setTimeout(resolve,2500)
+      );
+
+      const result=await fetch(
+        API_BASE+"/api/plagiarism/"+
+        encodeURIComponent(data.scanId)+
+        "?t="+Date.now()
+      );
+
+      const scan=await result.json();
+
+      if(scan.status==="completed"){
+
+        status.textContent=
+          "✓ Scan completed successfully.";
+
+        alert(
+          "Scan completed. Return to the main DPT-Detector workspace to view detailed results."
+        );
+
+        break;
+      }
+
+      if(scan.status==="error"){
+        throw new Error(
+          scan.error||"Plagiarism scan failed."
+        );
+      }
+
+      status.textContent=
+        "Scanning... "+
+        Math.min(
+          98,
+          Math.round((i+1)/60*100)
+        )+"%";
+    }
+
+  }catch(error){
+
+    status.textContent=
+      "Error: "+error.message;
+
+  }finally{
+
+    check.disabled=false;
+
+  }
+};
+</script>
+
+</body>
+</html>
