@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>Free Online Writing Tools | DPT-Detector</title>
+
+<meta name="description"
+content="Use DPT-Detector's free online writing tools for word counting, text cleanup, capitalization and quick text utilities.">
+
+<link rel="canonical"
+href="https://dhanush-dpt1429.github.io/DPT-Detector/writing-tools/">
+
+</head>
+
+<body>
+
+<h1>Free Online Writing Tools</h1>
+
+<p>
+Useful tools for editing, cleaning and understanding your text.
+</p>
+
+<textarea
+id="text"
+placeholder="Enter your text..."
+></textarea>
+
+<br>
+
+<button onclick="upper()">UPPERCASE</button>
+
+<button onclick="lower()">lowercase</button>
+
+<button onclick="clean()">Clean spacing</button>
+
+<button onclick="count()">Word statistics</button>
+
+<button onclick="copyText()">Copy</button>
+
+<button onclick="clearText()">Clear</button>
+
+<div id="result"></div>
+
+<script>
+
+function upper(){
+text.value=text.value.toUpperCase();
+}
+
+function lower(){
+text.value=text.value.toLowerCase();
+}
+
+function clean(){
+text.value=text.value
+.replace(/\s+/g," ")
+.trim();
+}
+
+function count(){
+
+const words=
+(text.value.trim().match(/\S+/g)||[]).length;
+
+const sentences=
+(text.value.match(/[.!?]+/g)||[]).length;
+
+result.innerHTML=
+`<p>${words} words • ${sentences} sentences • ${text.value.length} characters</p>`;
+}
+
+async function copyText(){
+await navigator.clipboard.writeText(text.value);
+result.textContent="Copied!";
+}
+
+function clearText(){
+text.value="";
+result.textContent="";
+}
+
+</script>
+
+</body>
+</html>
