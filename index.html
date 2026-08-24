@@ -145,9 +145,18 @@ $("#plagBtn").onclick=async()=>{
    const d=await r.json();if(!r.ok)throw new Error(d.error||"Could not start scan.");
    status(st,'<span class="spinner"></span>Scan submitted. Searching sources…');
    let done=false;
-   for(let i=0;i<60;i++){
-     await new Promise(x=>setTimeout(x,2500));
-     const q=await fetch(API_BASE+"/api/plagiarism/"+encodeURIComponent(d.scanId));const data=await q.json();
+   for(let i=0;i<120;i++){
+     await new Promise(x=>setTimeout(x,3000));
+     const q = await fetch(
+  API_BASE +
+  "/api/plagiarism/" +
+  encodeURIComponent(d.scanId) +
+  "?t=" +
+  Date.now(),
+  {
+    cache: "no-store"
+  }
+);const data=await q.json();
      if(data.status==="completed"){done=true;renderPlag(data);break}
      if(data.status==="error")throw new Error(data.error||"The plagiarism scan failed.");
      status(st,`<span class="spinner"></span>Scanning… ${Math.min(98,Math.round((i+1)/60*100))}%`);
