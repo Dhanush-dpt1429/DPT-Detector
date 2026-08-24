@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://dhanush-dpt1429.github.io/DPT-Detector/sitemap.xml
