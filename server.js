@@ -17,7 +17,10 @@ app.use(
 
 const PORT = Number(process.env.PORT || 8787);
 const MAX_WORDS = 5000;
-const scans = new Map();
+
+/* -------------------------------------------------------
+   GENERAL HELPERS
+------------------------------------------------------- */
 
 function wordCount(text) {
   return (String(text || "").trim().match(/\S+/g) || []).length;
@@ -44,6 +47,91 @@ function scanId() {
 }
 
 /* -------------------------------------------------------
+   UPSTASH REDIS
+------------------------------------------------------- */
+
+function requireRedis() {
+  requireEnv("UPSTASH_REDIS_REST_URL");
+  requireEnv("UPSTASH_REDIS_REST_TOKEN");
+}
+
+async function redisCommand(command) {
+  requireRedis();
+
+  const baseUrl = process.env.UPSTASH_REDIS_REST_URL.replace(/\/$/, "");
+
+  const url =
+    `${baseUrl}/` +
+    command
+      .map((value) => encodeURIComponent(String(value)))
+      .join("/");
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization:
+        `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}`,
+    },
+  });
+
+  const raw = await response.text();
+
+  let data;
+
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
+    throw new Error(
+      `Redis returned invalid JSON (${response.status}).`
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      data.error ||
+        data.message ||
+        `Redis request failed (${response.status}).`
+    );
+  }
+
+  return data.result;
+}
+
+async function saveScan(id, data) {
+  await redisCommand([
+    "set",
+    `dpt:scan:${id}`,
+    JSON.stringify(data),
+    "EX",
+    "7200",
+  ]);
+}
+
+async function getScan(id) {
+  const value = await redisCommand([
+    "get",
+    `dpt:scan:${id}`,
+  ]);
+
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    throw new Error("Stored scan data is invalid.");
+  }
+}
+
+async function deleteScan(id) {
+  await redisCommand([
+    "del",
+    `dpt:scan:${id}`,
+  ]);
+}
+
+/* -------------------------------------------------------
    COPYLEAKS AUTHENTICATION
 ------------------------------------------------------- */
 
@@ -63,7 +151,7 @@ async function getCopyleaksToken() {
     return copyleaksToken.value;
   }
 
-  const r = await fetch(
+  const response = await fetch(
     "https://id.copyleaks.com/v3/account/login/api",
     {
       method: "POST",
@@ -78,36 +166,40 @@ async function getCopyleaksToken() {
     }
   );
 
-  const raw = await r.text();
+  const raw = await response.text();
 
-  let d = {};
+  let data = {};
 
   try {
-    d = raw ? JSON.parse(raw) : {};
+    data = raw ? JSON.parse(raw) : {};
   } catch {
-    d = {};
+    data = {};
   }
 
-  if (!r.ok) {
+  if (!response.ok) {
     throw new Error(
-      d.message ||
-        d.error ||
-        `Copyleaks authentication failed (${r.status}).`
+      data.message ||
+        data.error ||
+        `Copyleaks authentication failed (${response.status}).`
     );
   }
 
-  if (!d.access_token) {
+  if (!data.access_token) {
     throw new Error(
       "Copyleaks authentication succeeded but no access token was returned."
     );
   }
 
   copyleaksToken = {
-    value: d.access_token,
-    expiresAt: Date.now() + 43 * 60 * 60 * 1000,
+    value: data.access_token,
+
+    // Copyleaks tokens normally last around 48 hours.
+    // Refresh slightly before expiration.
+    expiresAt:
+      Date.now() + 43 * 60 * 60 * 1000,
   };
 
-  return d.access_token;
+  return data.access_token;
 }
 
 /* -------------------------------------------------------
@@ -115,6 +207,8 @@ async function getCopyleaksToken() {
 ------------------------------------------------------- */
 
 app.get("/api/health", (req, res) => {
+  res.set("Cache-Control", "no-store");
+
   res.json({
     ok: true,
     service: "DPT-Detector",
@@ -123,7 +217,7 @@ app.get("/api/health", (req, res) => {
 });
 
 /* -------------------------------------------------------
-   PLAGIARISM
+   PLAGIARISM - SUBMIT
 ------------------------------------------------------- */
 
 app.post("/api/plagiarism", async (req, res) => {
@@ -134,7 +228,8 @@ app.post("/api/plagiarism", async (req, res) => {
 
     const id = scanId();
 
-    const webhookBase = process.env.PUBLIC_BACKEND_URL;
+    const webhookBase =
+      process.env.PUBLIC_BACKEND_URL;
 
     if (!webhookBase) {
       throw new Error(
@@ -142,27 +237,40 @@ app.post("/api/plagiarism", async (req, res) => {
       );
     }
 
-    const token = await getCopyleaksToken();
+    const token =
+      await getCopyleaksToken();
 
-    scans.set(id, {
+    const baseUrl =
+      webhookBase.replace(/\/$/, "");
+
+    /*
+      Save the scan BEFORE submitting it to Copyleaks.
+
+      This is important because the webhook can arrive
+      independently of the original request.
+    */
+
+    await saveScan(id, {
       status: "submitted",
       createdAt: Date.now(),
       results: null,
+      document: null,
       error: null,
     });
 
-    const baseUrl = webhookBase.replace(/\/$/, "");
-
-    const body = {
-      base64: Buffer.from(text, "utf8").toString("base64"),
+    const submission = {
+      base64:
+        Buffer.from(text, "utf8").toString("base64"),
 
       filename: "dpt-detector.txt",
 
       properties: {
         webhooks: {
-          status: `${baseUrl}/webhooks/copyleaks/{STATUS}/${id}`,
+          status:
+            `${baseUrl}/webhooks/copyleaks/{STATUS}/${id}`,
 
-          newResult: `${baseUrl}/webhooks/copyleaks/new-result/${id}`,
+          newResult:
+            `${baseUrl}/webhooks/copyleaks/new-result/${id}`,
         },
 
         scanning: {
@@ -175,115 +283,273 @@ app.post("/api/plagiarism", async (req, res) => {
           relatedMeaningEnabled: true,
         },
 
-        sandbox: process.env.COPYLEAKS_SANDBOX === "true",
+        sandbox:
+          process.env.COPYLEAKS_SANDBOX === "true",
 
         developerPayload: id,
       },
     };
 
-    const r = await fetch(
+    const response = await fetch(
       `https://api.copyleaks.com/v3/scans/submit/file/${id}`,
       {
         method: "PUT",
 
         headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+          Authorization:
+            `Bearer ${token}`,
+
+          "Content-Type":
+            "application/json",
+
+          Accept:
+            "application/json",
         },
 
-        body: JSON.stringify(body),
+        body:
+          JSON.stringify(submission),
       }
     );
 
-    const raw = await r.text();
+    const raw =
+      await response.text();
 
-    let d = {};
+    let data = {};
 
     try {
-      d = raw ? JSON.parse(raw) : {};
+      data =
+        raw ? JSON.parse(raw) : {};
     } catch {
-      d = {};
+      data = {};
     }
 
-    if (!r.ok) {
-      scans.delete(id);
+    if (!response.ok) {
+      await deleteScan(id);
 
       throw new Error(
-        d.message ||
-          d.error ||
-          `Copyleaks scan submission failed (${r.status}).`
+        data.message ||
+          data.error ||
+          `Copyleaks scan submission failed (${response.status}).`
       );
     }
 
-    scans.get(id).provider = d;
+    const current =
+      await getScan(id);
+
+    await saveScan(id, {
+      ...(current || {}),
+      status: "submitted",
+      provider: data,
+      submittedAt: Date.now(),
+    });
+
+    console.log(
+      "Copyleaks scan submitted:",
+      id
+    );
 
     res.status(202).json({
       scanId: id,
       status: "submitted",
     });
-  } catch (e) {
-    console.error("Plagiarism error:", e);
+  } catch (error) {
+    console.error(
+      "Plagiarism submission error:",
+      error
+    );
 
     res.status(400).json({
-      error: e.message || "Plagiarism check failed.",
+      error:
+        error.message ||
+        "Plagiarism check failed.",
     });
   }
 });
 
 /* -------------------------------------------------------
-   PLAGIARISM STATUS
+   PLAGIARISM - STATUS
 ------------------------------------------------------- */
 
-app.get("/api/plagiarism/:id", (req, res) => {
-  const s = scans.get(req.params.id);
+app.get(
+  "/api/plagiarism/:id",
+  async (req, res) => {
+    try {
+      const scan =
+        await getScan(req.params.id);
 
-  if (!s) {
-    return res.status(404).json({
-      error: "Scan not found or expired.",
-    });
+      if (!scan) {
+        return res.status(404).json({
+          error:
+            "Scan not found or expired.",
+        });
+      }
+
+      /*
+        Prevent Vercel/browser/CDN caching.
+
+        This also fixes the 304 responses you were seeing.
+      */
+
+      res.set(
+        "Cache-Control",
+        "no-store, no-cache, must-revalidate, proxy-revalidate"
+      );
+
+      res.set(
+        "Pragma",
+        "no-cache"
+      );
+
+      res.set(
+        "Expires",
+        "0"
+      );
+
+      res.json(scan);
+    } catch (error) {
+      console.error(
+        "Plagiarism status error:",
+        error
+      );
+
+      res.status(500).json({
+        error:
+          error.message ||
+          "Could not retrieve scan status.",
+      });
+    }
   }
-
-  res.json(s);
-});
+);
 
 /* -------------------------------------------------------
-   COPYLEAKS WEBHOOK
+   COPYLEAKS STATUS WEBHOOK
 ------------------------------------------------------- */
 
-function acceptWebhook(req, res) {
+async function acceptWebhook(req, res) {
   const id = req.params.id;
+  const status = req.params.status;
 
-  const s = scans.get(id);
+  try {
+    console.log(
+      `Copyleaks webhook received: ${status} / ${id}`
+    );
 
-  if (!s) {
+    const scan =
+      await getScan(id);
+
+    /*
+      Copyleaks can retry webhooks.
+      Returning 200 for an unknown scan prevents
+      unnecessary repeated delivery attempts.
+    */
+
+    if (!scan) {
+      console.warn(
+        `Unknown Copyleaks scan ID: ${id}`
+      );
+
+      return res.status(200).json({
+        ok: true,
+      });
+    }
+
+    const payload =
+      req.body || {};
+
+    scan.webhookAt =
+      Date.now();
+
+    scan.lastWebhookStatus =
+      status;
+
+    /*
+      COMPLETED
+    */
+
+    if (status === "completed") {
+      scan.status =
+        "completed";
+
+      /*
+        Copyleaks' completed webhook includes
+        results directly in the payload.
+      */
+
+      scan.results =
+        payload.results || {};
+
+      scan.document =
+        payload.scannedDocument || {};
+
+      scan.notifications =
+        payload.notifications || {};
+
+      scan.completedAt =
+        Date.now();
+
+      console.log(
+        `Copyleaks scan completed: ${id}`
+      );
+    }
+
+    /*
+      ERROR
+    */
+
+    else if (status === "error") {
+      scan.status =
+        "error";
+
+      scan.error =
+        payload.error?.message ||
+        payload.message ||
+        "The Copyleaks plagiarism scan failed.";
+
+      scan.completedAt =
+        Date.now();
+
+      console.error(
+        `Copyleaks scan failed: ${id}`,
+        scan.error
+      );
+    }
+
+    /*
+      Other Copyleaks statuses
+      such as creditsChecked/indexed.
+    */
+
+    else {
+      scan.status =
+        status ||
+        "processing";
+    }
+
+    await saveScan(
+      id,
+      scan
+    );
+
     return res.status(200).json({
       ok: true,
     });
+  } catch (error) {
+    console.error(
+      "Copyleaks webhook error:",
+      error
+    );
+
+    /*
+      Return 500 so Copyleaks can retry
+      the webhook when our storage/backend
+      temporarily fails.
+    */
+
+    return res.status(500).json({
+      error:
+        "Webhook processing failed.",
+    });
   }
-
-  const payload = req.body || {};
-
-  s.webhookAt = Date.now();
-
-  if (req.params.status === "completed") {
-    s.status = "completed";
-
-    s.results = payload.results || {};
-
-    s.document = payload.scannedDocument || {};
-  } else if (req.params.status === "error") {
-    s.status = "error";
-
-    s.error =
-      payload.error?.message ||
-      "The plagiarism scan failed.";
-  } else {
-    s.status = req.params.status || "processing";
-  }
-
-  res.status(200).json({
-    ok: true,
-  });
 }
 
 app.post(
@@ -291,22 +557,80 @@ app.post(
   acceptWebhook
 );
 
+/* -------------------------------------------------------
+   COPYLEAKS NEW RESULT WEBHOOK
+------------------------------------------------------- */
+
 app.post(
   "/webhooks/copyleaks/new-result/:id",
-  (req, res) => {
-    const s = scans.get(req.params.id);
+  async (req, res) => {
+    const id =
+      req.params.id;
 
-    if (s) {
-      s.liveResults = s.liveResults || [];
+    try {
+      console.log(
+        `Copyleaks new-result webhook: ${id}`
+      );
 
-      if (req.body?.internet) {
-        s.liveResults.push(...req.body.internet);
+      const scan =
+        await getScan(id);
+
+      if (!scan) {
+        return res.status(200).json({
+          ok: true,
+        });
       }
-    }
 
-    res.status(200).json({
-      ok: true,
-    });
+      const payload =
+        req.body || {};
+
+      scan.liveResults =
+        scan.liveResults || [];
+
+      /*
+        Copyleaks may send internet/database/
+        repositories depending on enabled features.
+      */
+
+      if (
+        Array.isArray(
+          payload.internet
+        )
+      ) {
+        scan.liveResults.push(
+          ...payload.internet
+        );
+      }
+
+      if (
+        Array.isArray(
+          payload.database
+        )
+      ) {
+        scan.liveResults.push(
+          ...payload.database
+        );
+      }
+
+      await saveScan(
+        id,
+        scan
+      );
+
+      res.status(200).json({
+        ok: true,
+      });
+    } catch (error) {
+      console.error(
+        "Copyleaks new-result webhook error:",
+        error
+      );
+
+      res.status(500).json({
+        error:
+          "Webhook processing failed.",
+      });
+    }
   }
 );
 
@@ -314,22 +638,26 @@ app.post(
    GEMINI NATURAL REWRITE
 ------------------------------------------------------- */
 
-app.post("/api/rewrite", async (req, res) => {
-  try {
-    const {
-      text,
-      style = "Natural",
-    } = req.body;
+app.post(
+  "/api/rewrite",
+  async (req, res) => {
+    try {
+      const {
+        text,
+        style = "Natural",
+      } = req.body;
 
-    assertText(text);
+      assertText(text);
 
-    requireEnv("GEMINI_API_KEY");
+      requireEnv(
+        "GEMINI_API_KEY"
+      );
 
-    const model =
-      process.env.GEMINI_MODEL ||
-      "gemini-2.5-flash";
+      const model =
+        process.env.GEMINI_MODEL ||
+        "gemini-3.6-flash";
 
-    const prompt = `
+      const prompt = `
 You are DPT-Detector's writing improvement engine.
 
 Rewrite the user's text so it sounds genuinely natural, fluent, clear, and well-written.
@@ -354,82 +682,135 @@ USER TEXT:
 ${text}
 `;
 
-    const url =
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`;
+      const url =
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+          model
+        )}:generateContent?key=${encodeURIComponent(
+          process.env.GEMINI_API_KEY
+        )}`;
 
-    const r = await fetch(url, {
-      method: "POST",
+      const response =
+        await fetch(url, {
+          method: "POST",
 
-      headers: {
-        "Content-Type": "application/json",
-      },
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
 
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
+          body: JSON.stringify({
+            contents: [
               {
-                text: prompt,
+                parts: [
+                  {
+                    text: prompt,
+                  },
+                ],
               },
             ],
-          },
-        ],
 
-        generationConfig: {
-          temperature: 0.8,
-        },
-      }),
-    });
+            generationConfig: {
+              temperature: 0.8,
+            },
+          }),
+        });
 
-    const raw = await r.text();
+      const raw =
+        await response.text();
 
-    let d = {};
+      let data = {};
 
-    try {
-      d = raw ? JSON.parse(raw) : {};
-    } catch {
-      d = {};
-    }
+      try {
+        data =
+          raw ? JSON.parse(raw) : {};
+      } catch {
+        data = {};
+      }
 
-    if (!r.ok) {
-      console.error("Gemini API error:", r.status, raw);
+      if (!response.ok) {
+        console.error(
+          "Gemini API error:",
+          response.status,
+          raw
+        );
 
-      throw new Error(
-        d.error?.message ||
-          `Gemini API request failed (${r.status}).`
+        throw new Error(
+          data.error?.message ||
+            `Gemini API request failed (${response.status}).`
+        );
+      }
+
+      const output =
+        data
+          .candidates?.[0]
+          ?.content?.parts
+          ?.map(
+            (part) =>
+              part.text || ""
+          )
+          .join("")
+          .trim();
+
+      if (!output) {
+        throw new Error(
+          "Gemini returned an empty response."
+        );
+      }
+
+      res.json({
+        text: output,
+      });
+    } catch (error) {
+      console.error(
+        "Rewrite error:",
+        error
       );
+
+      res.status(400).json({
+        error:
+          error.message ||
+          "Rewrite failed.",
+      });
     }
-
-    const output =
-      d.candidates?.[0]?.content?.parts
-        ?.map((part) => part.text || "")
-        .join("")
-        .trim();
-
-    if (!output) {
-      throw new Error(
-        "Gemini returned an empty response."
-      );
-    }
-
-    res.json({
-      text: output,
-    });
-  } catch (e) {
-    console.error("Rewrite error:", e);
-
-    res.status(400).json({
-      error: e.message || "Rewrite failed.",
-    });
   }
-});
+);
 
 /* -------------------------------------------------------
-   START SERVER
+   404 API HANDLER
 ------------------------------------------------------- */
 
-app.listen(PORT, () => {
-  console.log(
-    `DPT-Detector backend running on port ${PORT}`
-  );
-});
+app.use(
+  "/api",
+  (req, res) => {
+    res.status(404).json({
+      error:
+        "API endpoint not found.",
+    });
+  }
+);
+
+/* -------------------------------------------------------
+   VERCEL / LOCAL SERVER
+------------------------------------------------------- */
+
+/*
+  Vercel can use the Express app directly.
+
+  When running locally with:
+      npm start
+
+  the server will listen on PORT.
+
+  On Vercel, the platform handles
+  the HTTP server.
+*/
+
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(
+      `DPT-Detector backend running on port ${PORT}`
+    );
+  });
+}
+
+export default app;
