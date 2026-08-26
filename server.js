@@ -7,39 +7,37 @@ const app = express();
 
 app.use(express.json({ limit: "1mb" }));
 
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "*";
+const FRONTEND_ORIGIN =
+  process.env.FRONTEND_ORIGIN || "*";
 
 app.use(
   cors({
-    origin: FRONTEND_ORIGIN === "*" ? true : FRONTEND_ORIGIN,
+    origin:
+      FRONTEND_ORIGIN === "*"
+        ? true
+        : FRONTEND_ORIGIN,
   })
 );
 
-const PORT = Number(process.env.PORT || 8787);
+const PORT =
+  Number(process.env.PORT || 8787);
 
 const MAX_WORDS = 5000;
 
 /*
-  IMPORTANT:
-  A single matching word is normally not useful evidence
-  of plagiarism.
-
-  We therefore ignore sources with fewer than 3 matched words.
+=======================================================
+PLAGIARISM FILTER SETTINGS
+=======================================================
 */
+
 const MIN_MATCH_WORDS = 3;
-
-/*
-  Ignore extremely tiny matches.
-
-  Example:
-  3 matching words in a 5,000-word document = 0.06%.
-*/
 const MIN_MATCH_PERCENT = 0.1;
 
-
-/* =======================================================
-   GENERAL HELPERS
-======================================================= */
+/*
+=======================================================
+GENERAL HELPERS
+=======================================================
+*/
 
 function wordCount(text) {
   return (
@@ -49,22 +47,24 @@ function wordCount(text) {
   ).length;
 }
 
-
 function assertText(text) {
   if (
     typeof text !== "string" ||
     !text.trim()
   ) {
-    throw new Error("Text is required.");
+    throw new Error(
+      "Text is required."
+    );
   }
 
-  if (wordCount(text) > MAX_WORDS) {
+  const words = wordCount(text);
+
+  if (words > MAX_WORDS) {
     throw new Error(
-      "Maximum 5,000 words per request."
+      `Maximum ${MAX_WORDS.toLocaleString()} words per request.`
     );
   }
 }
-
 
 function requireEnv(name) {
   if (!process.env[name]) {
@@ -74,24 +74,18 @@ function requireEnv(name) {
   }
 }
 
-
-function scanId() {
+function createScanId() {
   return crypto
     .randomBytes(12)
     .toString("hex");
 }
 
-
 function cleanUrl(url) {
   if (!url) return "";
 
   try {
-    const parsed = new URL(url);
-
-    /*
-      Remove tracking parameters that can create
-      duplicate-looking results.
-    */
+    const parsed =
+      new URL(url);
 
     const removeParams = [
       "utm_source",
@@ -100,12 +94,19 @@ function cleanUrl(url) {
       "utm_term",
       "utm_content",
       "gclid",
-      "fbclid"
+      "fbclid",
+      "mc_cid",
+      "mc_eid"
     ];
 
-    removeParams.forEach((param) => {
-      parsed.searchParams.delete(param);
-    });
+    for (
+      const parameter
+      of removeParams
+    ) {
+      parsed.searchParams.delete(
+        parameter
+      );
+    }
 
     return parsed.toString();
   } catch {
@@ -113,10 +114,11 @@ function cleanUrl(url) {
   }
 }
 
-
-/* =======================================================
-   UPSTASH REDIS
-======================================================= */
+/*
+=======================================================
+UPSTASH REDIS
+=======================================================
+*/
 
 function requireRedis() {
   requireEnv(
@@ -128,12 +130,14 @@ function requireRedis() {
   );
 }
 
-
-async function redisCommand(command) {
+async function redisCommand(
+  command
+) {
   requireRedis();
 
   const baseUrl =
-    process.env.UPSTASH_REDIS_REST_URL
+    process.env
+      .UPSTASH_REDIS_REST_URL
       .replace(/\/$/, "");
 
   const url =
@@ -182,23 +186,24 @@ async function redisCommand(command) {
   return data.result;
 }
 
-
-async function saveScan(id, data) {
+async function saveScan(
+  id,
+  data
+) {
   await redisCommand([
     "set",
     `dpt:scan:${id}`,
     JSON.stringify(data),
     "EX",
-    "7200",
+    "7200"
   ]);
 }
-
 
 async function getScan(id) {
   const value =
     await redisCommand([
       "get",
-      `dpt:scan:${id}`,
+      `dpt:scan:${id}`
     ]);
 
   if (!value) {
@@ -214,27 +219,25 @@ async function getScan(id) {
   }
 }
 
-
 async function deleteScan(id) {
   await redisCommand([
     "del",
-    `dpt:scan:${id}`,
+    `dpt:scan:${id}`
   ]);
 }
 
-
-/* =======================================================
-   COPYLEAKS AUTHENTICATION
-======================================================= */
+/*
+=======================================================
+COPYLEAKS AUTHENTICATION
+=======================================================
+*/
 
 let copyleaksToken = {
   value: null,
-  expiresAt: 0,
+  expiresAt: 0
 };
 
-
 async function getCopyleaksToken() {
-
   requireEnv(
     "COPYLEAKS_EMAIL"
   );
@@ -262,7 +265,7 @@ async function getCopyleaksToken() {
             "application/json",
 
           Accept:
-            "application/json",
+            "application/json"
         },
 
         body:
@@ -271,8 +274,8 @@ async function getCopyleaksToken() {
               process.env.COPYLEAKS_EMAIL,
 
             key:
-              process.env.COPYLEAKS_API_KEY,
-          }),
+              process.env.COPYLEAKS_API_KEY
+          })
       }
     );
 
@@ -300,50 +303,37 @@ async function getCopyleaksToken() {
 
   if (!data.access_token) {
     throw new Error(
-      "Copyleaks authentication succeeded but no access token was returned."
+      "Copyleaks did not return an access token."
     );
   }
+
+  /*
+    Copyleaks tokens are valid for a long period.
+    Refresh slightly before expiration.
+  */
 
   copyleaksToken = {
     value:
       data.access_token,
 
-    /*
-      Refresh before the normal expiration.
-    */
-
     expiresAt:
       Date.now() +
-      43 * 60 * 60 * 1000,
+      43 * 60 * 60 * 1000
   };
 
   return data.access_token;
 }
 
-
-/* =======================================================
-   PLAGIARISM RESULT NORMALIZATION
-======================================================= */
-
 /*
-  This is the most important fix.
-
-  Copyleaks gives us individual Internet matches.
-
-  We:
-  1. Remove 1-2 word matches.
-  2. Calculate percentage against document word count.
-  3. Prefer canonical/final URLs.
-  4. Remove duplicate URLs.
-  5. Sort strongest matches first.
+=======================================================
+NORMALIZE INTERNET SOURCES
+=======================================================
 */
-
 
 function normalizeInternetResults(
   results,
   totalWords
 ) {
-
   if (
     !Array.isArray(results)
   ) {
@@ -353,109 +343,111 @@ function normalizeInternetResults(
   const unique =
     new Map();
 
-  for (const item of results) {
-
+  for (
+    const item
+    of results
+  ) {
     const matchedWords =
       Number(
-        item.matchedWords || 0
+        item?.matchedWords || 0
       );
 
     if (
       !Number.isFinite(
         matchedWords
-      ) ||
-      matchedWords <
-        MIN_MATCH_WORDS
+      )
     ) {
       continue;
     }
 
-    const percentage =
+    /*
+      Ignore extremely tiny matches.
+
+      1-2 words are normally
+      not useful evidence.
+    */
+
+    if (
+      matchedWords <
+      MIN_MATCH_WORDS
+    ) {
+      continue;
+    }
+
+    const matchPercent =
       totalWords > 0
-        ? (matchedWords /
-            totalWords) *
+        ? (
+            matchedWords /
+            totalWords
+          ) *
           100
         : 0;
 
     if (
-      percentage <
+      matchPercent <
       MIN_MATCH_PERCENT
     ) {
       continue;
     }
 
     /*
-      Prefer:
-
-      canonicalUrl
-      ↓
-      finalUrl
-      ↓
-      url
+      Prefer canonical URL,
+      then final URL,
+      then normal URL.
     */
 
     const rawUrl =
-      item.metadata?.canonicalUrl ||
-      item.metadata?.finalUrl ||
-      item.url ||
+      item?.metadata?.canonicalUrl ||
+      item?.metadata?.finalUrl ||
+      item?.url ||
       "";
 
-    const sourceUrl =
+    const url =
       cleanUrl(rawUrl);
 
-    if (!sourceUrl) {
+    if (!url) {
       continue;
     }
 
-    /*
-      Normalize URL for duplicate detection.
-    */
-
-    let key = sourceUrl
-      .toLowerCase()
-      .replace(/\/+$/, "");
-
-    /*
-      If we already have the same URL,
-      keep whichever result has the
-      highest matched-word count.
-    */
-
-    const existing =
-      unique.get(key);
+    const key =
+      url
+        .toLowerCase()
+        .replace(/\/+$/, "");
 
     const normalized = {
       id:
-        item.id || "",
+        item?.id || "",
 
       title:
-        item.title ||
-        sourceUrl,
+        item?.title ||
+        url,
 
       introduction:
-        item.introduction ||
+        item?.introduction ||
         "",
 
-      url:
-        sourceUrl,
+      url,
 
       matchedWords,
 
       matchPercent:
         Number(
-          percentage.toFixed(2)
+          matchPercent.toFixed(2)
         ),
 
       metadata:
-        item.metadata || {},
+        item?.metadata || {},
 
       tags:
         Array.isArray(
-          item.tags
+          item?.tags
         )
           ? item.tags
           : []
     };
+
+    const existing =
+      unique.get(key);
 
     if (
       !existing ||
@@ -478,23 +470,27 @@ function normalizeInternetResults(
     );
 }
 
-
 /*
-  Calculate a transparent overall
-  similarity percentage.
+=======================================================
+CALCULATE VERIFIED SOURCE COVERAGE
+=======================================================
 
-  This uses the number of unique
-  matched words against the submitted
-  document's word count.
+This is NOT used as a replacement for Copyleaks'
+official aggregated plagiarism score.
 
-  It is NOT simply:
-      100 - Copyleaks score
+It is an additional transparent statistic showing
+how much of the submitted document is represented by
+the returned source matches.
+
+Because multiple sources can overlap, this should be
+treated as source coverage, not a perfect plagiarism
+percentage.
 */
-function calculateOverallSimilarity(
+
+function calculateSourceCoverage(
   results,
   totalWords
 ) {
-
   if (
     !totalWords ||
     !results.length
@@ -502,22 +498,7 @@ function calculateOverallSimilarity(
     return 0;
   }
 
-  /*
-    A word may appear in multiple sources.
-
-    We therefore DO NOT simply add all
-    source matchedWords together.
-
-    Instead, use Copyleaks aggregated score
-    when available, but never allow it to
-    contradict our filtering.
-
-    If unavailable, use the strongest
-    source coverage as a conservative
-    fallback.
-  */
-
-  const coverage =
+  const totalMatched =
     results.reduce(
       (sum, item) =>
         sum +
@@ -530,22 +511,24 @@ function calculateOverallSimilarity(
   return Number(
     Math.min(
       100,
-      (coverage /
-        totalWords) *
+      (
+        totalMatched /
+        totalWords
+      ) *
         100
     ).toFixed(2)
   );
 }
 
-
-/* =======================================================
-   HEALTH
-======================================================= */
+/*
+=======================================================
+HEALTH
+=======================================================
+*/
 
 app.get(
   "/api/health",
   (req, res) => {
-
     res.set(
       "Cache-Control",
       "no-store"
@@ -555,23 +538,27 @@ app.get(
       ok: true,
       service:
         "DPT-Detector",
+      plagiarismProvider:
+        "Copyleaks",
+      sandbox:
+        process.env.COPYLEAKS_SANDBOX ===
+        "true",
       time:
-        new Date().toISOString(),
+        new Date().toISOString()
     });
   }
 );
 
-
-/* =======================================================
-   PLAGIARISM SUBMIT
-======================================================= */
+/*
+=======================================================
+PLAGIARISM SUBMIT
+=======================================================
+*/
 
 app.post(
   "/api/plagiarism",
   async (req, res) => {
-
     try {
-
       const {
         text
       } = req.body;
@@ -579,7 +566,7 @@ app.post(
       assertText(text);
 
       const id =
-        scanId();
+        createScanId();
 
       const totalWords =
         wordCount(text);
@@ -601,8 +588,14 @@ app.post(
           .replace(/\/$/, "");
 
       /*
-        Save BEFORE submission.
+        IMPORTANT:
+        Never use sandbox for production
+        plagiarism results.
       */
+
+      const sandbox =
+        process.env.COPYLEAKS_SANDBOX ===
+        "true";
 
       await saveScan(
         id,
@@ -623,12 +616,15 @@ app.post(
 
           error:
             null,
+
+          provider:
+            "Copyleaks",
+
+          sandbox
         }
       );
 
-
       const submission = {
-
         base64:
           Buffer
             .from(
@@ -643,23 +639,20 @@ app.post(
           "dpt-detector.txt",
 
         properties: {
-
           webhooks: {
-
             status:
               `${baseUrl}/webhooks/copyleaks/{STATUS}/${id}`,
 
             newResult:
-              `${baseUrl}/webhooks/copyleaks/new-result/${id}`,
+              `${baseUrl}/webhooks/copyleaks/new-result/${id}`
           },
 
           scanning: {
             internet:
-              true,
+              true
           },
 
           filters: {
-
             identicalEnabled:
               true,
 
@@ -667,29 +660,24 @@ app.post(
               true,
 
             relatedMeaningEnabled:
-              true,
+              true
           },
 
-          sandbox:
-            process.env.COPYLEAKS_SANDBOX ===
-            "true",
+          sandbox,
 
           developerPayload:
-            id,
-        },
+            id
+        }
       };
-
 
       const response =
         await fetch(
           `https://api.copyleaks.com/v3/scans/submit/file/${id}`,
           {
-
             method:
               "PUT",
 
             headers: {
-
               Authorization:
                 `Bearer ${token}`,
 
@@ -697,16 +685,15 @@ app.post(
                 "application/json",
 
               Accept:
-                "application/json",
+                "application/json"
             },
 
             body:
               JSON.stringify(
                 submission
-              ),
+              )
           }
         );
-
 
       const raw =
         await response.text();
@@ -722,24 +709,18 @@ app.post(
         data = {};
       }
 
-
       if (!response.ok) {
-
-        await deleteScan(
-          id
-        );
+        await deleteScan(id);
 
         throw new Error(
           data.message ||
             data.error ||
-            `Copyleaks scan submission failed (${response.status}).`
+            `Copyleaks submission failed (${response.status}).`
         );
       }
 
-
       const current =
         await getScan(id);
-
 
       await saveScan(
         id,
@@ -749,31 +730,32 @@ app.post(
           status:
             "submitted",
 
-          provider:
+          providerResponse:
             data,
 
           submittedAt:
-            Date.now(),
+            Date.now()
         }
       );
-
 
       console.log(
         "Copyleaks scan submitted:",
         id
       );
 
+      console.log(
+        "Sandbox:",
+        sandbox
+      );
 
       res.status(202).json({
         scanId:
           id,
 
         status:
-          "submitted",
+          "submitted"
       });
-
     } catch (error) {
-
       console.error(
         "Plagiarism submission error:",
         error
@@ -782,38 +764,35 @@ app.post(
       res.status(400).json({
         error:
           error.message ||
-          "Plagiarism check failed.",
+          "Plagiarism check failed."
       });
     }
   }
 );
 
-
-/* =======================================================
-   PLAGIARISM STATUS
-======================================================= */
+/*
+=======================================================
+PLAGIARISM STATUS
+=======================================================
+*/
 
 app.get(
   "/api/plagiarism/:id",
   async (req, res) => {
-
     try {
-
       const scan =
         await getScan(
           req.params.id
         );
 
       if (!scan) {
-
         return res
           .status(404)
           .json({
             error:
-              "Scan not found or expired.",
+              "Scan not found or expired."
           });
       }
-
 
       res.set(
         "Cache-Control",
@@ -830,13 +809,8 @@ app.get(
         "0"
       );
 
-
-      res.json(
-        scan
-      );
-
+      res.json(scan);
     } catch (error) {
-
       console.error(
         "Plagiarism status error:",
         error
@@ -845,57 +819,50 @@ app.get(
       res.status(500).json({
         error:
           error.message ||
-          "Could not retrieve scan status.",
+          "Could not retrieve scan status."
       });
     }
   }
 );
 
-
-/* =======================================================
-   COPYLEAKS STATUS WEBHOOK
-======================================================= */
+/*
+=======================================================
+COPYLEAKS STATUS WEBHOOK
+=======================================================
+*/
 
 async function acceptWebhook(
   req,
   res
 ) {
-
   const id =
     req.params.id;
 
   const status =
     req.params.status;
 
-
   try {
-
     console.log(
-      `Copyleaks webhook received: ${status} / ${id}`
+      `Copyleaks webhook: ${status} / ${id}`
     );
-
 
     const scan =
       await getScan(id);
 
-
     if (!scan) {
-
       console.warn(
-        `Unknown Copyleaks scan ID: ${id}`
+        `Unknown scan ID: ${id}`
       );
 
       return res
         .status(200)
         .json({
-          ok: true,
+          ok: true
         });
     }
 
-
     const payload =
       req.body || {};
-
 
     scan.webhookAt =
       Date.now();
@@ -903,20 +870,16 @@ async function acceptWebhook(
     scan.lastWebhookStatus =
       status;
 
-
-    /* -----------------------------------------------
-       COMPLETED
-    ------------------------------------------------ */
+    /*
+    =====================================================
+    COMPLETED
+    =====================================================
+    */
 
     if (
       status ===
       "completed"
     ) {
-
-      scan.status =
-        "completed";
-
-
       const scannedDocument =
         payload.scannedDocument ||
         {};
@@ -924,15 +887,15 @@ async function acceptWebhook(
       const totalWords =
         Number(
           scannedDocument.totalWords ||
+          payload.totalWords ||
           scan.totalWords ||
           0
         );
 
-
       const rawResults =
         payload.results?.internet ||
+        payload.internet ||
         [];
-
 
       const filteredResults =
         normalizeInternetResults(
@@ -940,20 +903,39 @@ async function acceptWebhook(
           totalWords
         );
 
+      const providerScore =
+        Number(
+          payload.results
+            ?.score
+            ?.aggregatedScore
+        );
+
+      const providerScoreValid =
+        Number.isFinite(
+          providerScore
+        );
+
+      const sourceCoverage =
+        calculateSourceCoverage(
+          filteredResults,
+          totalWords
+        );
 
       /*
-        Save both the raw Copyleaks
-        response and our cleaned results.
+        IMPORTANT:
 
-        This is useful for debugging.
+        Keep Copyleaks' official score.
+
+        Do NOT replace it with:
+          100 - score
+        until the frontend explicitly
+        interprets it as originality.
       */
 
-      scan.rawResults =
-        payload.results || {};
-
+      scan.status =
+        "completed";
 
       scan.results = {
-
         score:
           payload.results?.score ||
           {},
@@ -974,11 +956,16 @@ async function acceptWebhook(
           [],
 
         /*
-          Helpful statistics.
+          Additional DPT statistics.
         */
+
+        sourceCoverage,
 
         totalInternetSources:
           filteredResults.length,
+
+        rawInternetSources:
+          rawResults.length,
 
         filteredOutSources:
           Math.max(
@@ -987,97 +974,111 @@ async function acceptWebhook(
               filteredResults.length
           ),
 
-        overallSimilarity:
-          calculateOverallSimilarity(
-            filteredResults,
-            totalWords
-          ),
+        providerScore:
+          providerScoreValid
+            ? providerScore
+            : null
       };
-
 
       scan.document =
         scannedDocument;
 
-
       scan.notifications =
         payload.notifications ||
-        [];
-
+        {};
 
       scan.totalWords =
         totalWords;
 
-
       scan.completedAt =
         Date.now();
 
+      /*
+        If sandbox mode is accidentally enabled,
+        make that visible in the result.
+      */
+
+      scan.warning =
+        scan.sandbox
+          ? "SANDBOX MODE IS ENABLED. RESULTS ARE MOCK RESULTS AND MUST NOT BE PRESENTED AS REAL PLAGIARISM RESULTS."
+          : null;
 
       console.log(
-        `Copyleaks scan completed: ${id}`
+        "Copyleaks scan completed:",
+        id
       );
 
       console.log(
-        `Total words: ${totalWords}`
+        "Total words:",
+        totalWords
       );
 
       console.log(
-        `Raw sources: ${rawResults.length}`
+        "Raw internet sources:",
+        rawResults.length
       );
 
       console.log(
-        `Meaningful sources: ${filteredResults.length}`
+        "Meaningful sources:",
+        filteredResults.length
+      );
+
+      console.log(
+        "Provider similarity:",
+        providerScore
+      );
+
+      console.log(
+        "Source coverage:",
+        sourceCoverage
       );
     }
 
-
-    /* -----------------------------------------------
-       ERROR
-    ------------------------------------------------ */
+    /*
+    =====================================================
+    ERROR
+    =====================================================
+    */
 
     else if (
       status ===
       "error"
     ) {
-
       scan.status =
         "error";
 
       scan.error =
         payload.error?.message ||
         payload.message ||
-        "The Copyleaks plagiarism scan failed.";
+        "Copyleaks scan failed.";
 
       scan.completedAt =
         Date.now();
     }
 
-
-    /* -----------------------------------------------
-       OTHER STATUS
-    ------------------------------------------------ */
+    /*
+    =====================================================
+    OTHER STATUS
+    =====================================================
+    */
 
     else {
-
       scan.status =
         status ||
         "processing";
     }
-
 
     await saveScan(
       id,
       scan
     );
 
-
     return res
       .status(200)
       .json({
-        ok: true,
+        ok: true
       });
-
   } catch (error) {
-
     console.error(
       "Copyleaks webhook error:",
       error
@@ -1087,76 +1088,94 @@ async function acceptWebhook(
       .status(500)
       .json({
         error:
-          "Webhook processing failed.",
+          "Webhook processing failed."
       });
   }
 }
-
 
 app.post(
   "/webhooks/copyleaks/:status/:id",
   acceptWebhook
 );
 
-
-/* =======================================================
-   NEW RESULT WEBHOOK
-======================================================= */
+/*
+=======================================================
+NEW RESULT WEBHOOK
+=======================================================
+*/
 
 app.post(
   "/webhooks/copyleaks/new-result/:id",
   async (req, res) => {
-
     const id =
       req.params.id;
 
     try {
-
       const scan =
         await getScan(id);
 
-
       if (!scan) {
-
         return res
           .status(200)
           .json({
-            ok: true,
+            ok: true
           });
       }
-
 
       const payload =
         req.body || {};
 
-
       scan.liveResults =
         scan.liveResults || [];
-
-
-      /*
-        Store only meaningful results.
-      */
 
       const totalWords =
         Number(
           scan.totalWords || 0
         );
 
+      /*
+        Copyleaks' new-result
+        payload contains the current
+        internet result.
+      */
 
-      const internet =
+      const incoming =
+        [];
+
+      if (
+        Array.isArray(
+          payload.internet
+        )
+      ) {
+        incoming.push(
+          ...payload.internet
+        );
+      }
+
+      /*
+        Sometimes a single result
+        is returned rather than an array.
+      */
+
+      if (
+        payload.url ||
+        payload.matchedWords
+      ) {
+        incoming.push(
+          payload
+        );
+      }
+
+      const normalized =
         normalizeInternetResults(
-          payload.internet ||
-            [],
+          incoming,
           totalWords
         );
 
-
       for (
         const result
-        of internet
+        of normalized
       ) {
-
         const exists =
           scan.liveResults.some(
             item =>
@@ -1165,75 +1184,67 @@ app.post(
           );
 
         if (!exists) {
-
           scan.liveResults.push(
             result
           );
         }
       }
 
-
       await saveScan(
         id,
         scan
       );
 
-
       return res
         .status(200)
         .json({
-          ok: true,
+          ok: true
         });
-
     } catch (error) {
-
       console.error(
-        "Copyleaks new-result webhook error:",
+        "Copyleaks new-result error:",
         error
       );
 
-      res.status(500).json({
-        error:
-          "Webhook processing failed.",
-      });
+      return res
+        .status(500)
+        .json({
+          error:
+            "Webhook processing failed."
+        });
     }
   }
 );
 
-
-/* =======================================================
-   GEMINI REWRITE
-======================================================= */
+/*
+=======================================================
+GEMINI REWRITE
+=======================================================
+*/
 
 app.post(
   "/api/rewrite",
   async (req, res) => {
-
     try {
-
       const {
         text,
-        style = "Natural",
+        style = "Natural"
       } = req.body;
 
-
       assertText(text);
-
 
       requireEnv(
         "GEMINI_API_KEY"
       );
 
-
       const model =
         process.env.GEMINI_MODEL ||
         "gemini-3.6-flash";
 
-
       const prompt = `
 You are DPT-Detector's writing improvement engine.
 
-Rewrite the user's text so it sounds genuinely natural, fluent, clear, and well-written.
+Rewrite the user's text so it sounds natural, fluent, clear and well-written.
 
 Style: ${style}
 
@@ -1248,13 +1259,11 @@ Requirements:
 - Keep approximately the same amount of information.
 - Do not add an introduction or explanation.
 - Return ONLY the rewritten text.
-- Do not discuss AI detection or plagiarism detection.
 
 USER TEXT:
 
 ${text}
 `;
-
 
       const url =
         `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
@@ -1263,18 +1272,16 @@ ${text}
           process.env.GEMINI_API_KEY
         )}`;
 
-
       const response =
         await fetch(
           url,
           {
-
             method:
               "POST",
 
             headers: {
               "Content-Type":
-                "application/json",
+                "application/json"
             },
 
             body:
@@ -1284,20 +1291,19 @@ ${text}
                     parts: [
                       {
                         text:
-                          prompt,
-                      },
-                    ],
-                  },
+                          prompt
+                      }
+                    ]
+                  }
                 ],
 
                 generationConfig: {
                   temperature:
-                    0.8,
-                },
-              }),
+                    0.8
+                }
+              })
           }
         );
-
 
       const raw =
         await response.text();
@@ -1313,15 +1319,12 @@ ${text}
         data = {};
       }
 
-
       if (!response.ok) {
-
         throw new Error(
           data.error?.message ||
             `Gemini API request failed (${response.status}).`
         );
       }
-
 
       const output =
         data
@@ -1335,22 +1338,17 @@ ${text}
           .join("")
           .trim();
 
-
       if (!output) {
-
         throw new Error(
           "Gemini returned an empty response."
         );
       }
 
-
       res.json({
         text:
-          output,
+          output
       });
-
     } catch (error) {
-
       console.error(
         "Rewrite error:",
         error
@@ -1359,45 +1357,43 @@ ${text}
       res.status(400).json({
         error:
           error.message ||
-          "Rewrite failed.",
+          "Rewrite failed."
       });
     }
   }
 );
 
-
-/* =======================================================
-   404 API
-======================================================= */
+/*
+=======================================================
+UNKNOWN API
+=======================================================
+*/
 
 app.use(
   "/api",
   (req, res) => {
-
     res.status(404).json({
       error:
-        "API endpoint not found.",
+        "API endpoint not found."
     });
   }
 );
 
-
-/* =======================================================
-   LOCAL / VERCEL
-======================================================= */
+/*
+=======================================================
+LOCAL / VERCEL
+=======================================================
+*/
 
 if (!process.env.VERCEL) {
-
   app.listen(
     PORT,
     () => {
-
       console.log(
         `DPT-Detector backend running on port ${PORT}`
       );
     }
   );
 }
-
 
 export default app;
