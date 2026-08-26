@@ -60,15 +60,14 @@ content="Check plagiarism, analyze writing and download professional reports.">
 }
 </script>
 
-<!-- File parsing libraries -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
-<!-- Report generation libraries -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
+
 :root{
 --bg:#060a12;
 --surface:#0c1220;
@@ -435,8 +434,6 @@ transform:rotate(360deg)
 }
 }
 
-/* Upload area */
-
 .upload-box{
 margin-top:18px;
 border:1.5px dashed #31506b;
@@ -496,8 +493,6 @@ font-size:.82rem;
 color:#aeeeff;
 word-break:break-word
 }
-
-/* Results */
 
 .results{
 display:none;
@@ -577,14 +572,20 @@ gap:16px;
 align-items:center;
 border:1px solid var(--line);
 background:#0d1727;
-padding:13px 15px;
+padding:15px;
 border-radius:13px
+}
+
+.source-main{
+min-width:0;
+flex:1
 }
 
 .source a{
 color:#aeeeff;
 text-decoration:none;
-font-weight:750
+font-weight:750;
+word-break:break-word
 }
 
 .source small{
@@ -592,18 +593,58 @@ color:var(--muted)
 }
 
 .source-url{
+display:block;
 font-size:.72rem;
 color:#647c96;
-max-width:45%;
-overflow:hidden;
-text-overflow:ellipsis;
-white-space:nowrap
+margin-top:5px;
+word-break:break-all
+}
+
+.source-badge{
+white-space:nowrap;
+font-size:.72rem;
+font-weight:800;
+padding:6px 8px;
+border-radius:8px;
+background:#122139;
+border:1px solid #29415d;
+color:#b9d8ef
+}
+
+.match-details{
+display:flex;
+gap:10px;
+flex-wrap:wrap;
+margin-top:9px;
+font-size:.72rem;
+color:#91a4bb
+}
+
+.match-details span{
+padding:4px 7px;
+border-radius:7px;
+background:#101c2e;
+border:1px solid #1f3047
 }
 
 .notice{
 margin-top:18px;
 color:#9fb2c8;
-font-size:.78rem
+font-size:.78rem;
+line-height:1.6
+}
+
+.notice strong{
+color:#d9e8f6
+}
+
+.empty-source{
+border:1px dashed #29415d;
+border-radius:14px;
+padding:18px;
+color:#91a4bb;
+background:#0b1524;
+line-height:1.6
 }
 
 .rewrite-grid{
@@ -752,8 +793,6 @@ text-align:center;
 box-shadow:0 30px 100px #0008
 }
 
-/* Professional report template */
-
 #reportTemplate{
 position:absolute;
 left:-10000px;
@@ -893,6 +932,7 @@ line-height:1.5
 }
 
 @media(max-width:900px){
+
 .app{
 grid-template-columns:1fr
 }
@@ -911,9 +951,11 @@ grid-template-columns:1fr
 .footgrid{
 grid-template-columns:1fr 1fr
 }
+
 }
 
 @media(max-width:650px){
+
 .nav{
 display:none
 }
@@ -962,7 +1004,18 @@ grid-template-columns:1fr
 .upload-box{
 padding:20px 12px
 }
+
+.source{
+align-items:flex-start;
+flex-direction:column
 }
+
+.source-badge{
+align-self:flex-start
+}
+
+}
+
 </style>
 </head>
 
@@ -1088,8 +1141,6 @@ TXT, DOCX and PDF supported
 </span>
 
 </div>
-
-<!-- FILE UPLOAD -->
 
 <div class="upload-box" id="uploadBox">
 
@@ -1542,7 +1593,7 @@ Created by Dhanush
 
 </footer>
 
-<!-- REPORT GENERATION TEMPLATE -->
+<!-- REPORT TEMPLATE -->
 
 <div id="reportTemplate">
 
@@ -1667,7 +1718,7 @@ Detected Sources
 </h2>
 
 <div id="reportSources">
-No sources detected.
+No verified sources detected.
 </div>
 
 </div>
@@ -1693,7 +1744,7 @@ https://dhanush-dpt1429.github.io/DPT-Detector/
 
 </div>
 
-<!-- REPORT LOADING -->
+<!-- LOADING -->
 
 <div
 class="report-loading"
@@ -1718,33 +1769,66 @@ Please wait while DPT-Detector creates your file.
 
 <script>
 
+/* =======================================================
+   CONFIGURATION
+======================================================= */
+
 const API_BASE =
 "https://dpt-detector.vercel.app";
 
 const LIMIT = 5000;
 
+/*
+ * IMPORTANT:
+ *
+ * A 1-word or 2-word match is normally not useful
+ * evidence of plagiarism.
+ *
+ * The frontend therefore hides internet sources
+ * with fewer than this many matched words.
+ *
+ * The backend should ALSO use the API's
+ * minCopiedWords setting.
+ */
+const MIN_SOURCE_MATCH_WORDS = 5;
+
+
+/* =======================================================
+   HELPERS
+======================================================= */
+
 const $ =
-s => document.querySelector(s);
+selector => document.querySelector(selector);
 
 const $$ =
-s => document.querySelectorAll(s);
+selector => document.querySelectorAll(selector);
 
-const countWords =
-t =>
-(t.trim().match(/\S+/g) || []).length;
+
+function countWords(text){
+
+return (
+String(text || "")
+.trim()
+.match(/\S+/g)
+|| []
+).length;
+
+}
+
 
 function bindCounter(id,out){
 
-const el=$(id);
+const el = $(id);
 
-const fn=()=>{
+if(!el || !out){
+return;
+}
 
-let n=countWords(el.value);
+const fn = ()=>{
 
-out.textContent =
-`${n.toLocaleString()} words • ${el.value.length.toLocaleString()} characters`;
+let n = countWords(el.value);
 
-if(n>LIMIT){
+if(n > LIMIT){
 
 el.value =
 el.value
@@ -1753,9 +1837,12 @@ el.value
 .slice(0,LIMIT)
 .join(" ");
 
-fn();
+n = LIMIT;
 
 }
+
+out.textContent =
+`${n.toLocaleString()} words • ${el.value.length.toLocaleString()} characters`;
 
 };
 
@@ -1767,6 +1854,11 @@ fn
 fn();
 
 }
+
+
+/* =======================================================
+   COUNTERS
+======================================================= */
 
 bindCounter(
 "#plagText",
@@ -1788,18 +1880,22 @@ bindCounter(
 $("#writeCount")
 );
 
-/* -------------------------------------------------------
-   TOOL SWITCHING
-------------------------------------------------------- */
 
-const views={
-plag:$("#plagView"),
-rewrite:$("#rewriteView"),
-read:$("#readView"),
-write:$("#writeView")
+/* =======================================================
+   TOOL SWITCHING
+======================================================= */
+
+const views = {
+
+plag: $("#plagView"),
+rewrite: $("#rewriteView"),
+read: $("#readView"),
+write: $("#writeView")
+
 };
 
-const meta={
+
+const meta = {
 
 plag:[
 "🔍 Plagiarism Check",
@@ -1823,11 +1919,12 @@ write:[
 
 };
 
+
 $$(".sidebtn").forEach(btn=>{
 
-btn.onclick=()=>{
+btn.onclick = ()=>{
 
-let type =
+const type =
 btn.dataset.tool;
 
 $$(".sidebtn")
@@ -1839,10 +1936,10 @@ btn.classList.add("active");
 
 Object.entries(views)
 .forEach(
-([k,v]) =>
-v.classList.toggle(
+([key,view]) =>
+view.classList.toggle(
 "hidden",
-k!==type
+key !== type
 )
 );
 
@@ -1856,47 +1953,284 @@ meta[type][1];
 
 });
 
-/* -------------------------------------------------------
+
+/* =======================================================
    STATUS
-------------------------------------------------------- */
+======================================================= */
 
 function status(
-el,
-msg,
-err=false
+element,
+message,
+error = false
 ){
 
-el.classList.add("show");
+if(!element){
+return;
+}
 
-el.innerHTML =
-err
+element.classList.add("show");
+
+element.innerHTML =
+error
 ?
-`<span class="error">⚠ ${msg}</span>`
+`<span class="error">⚠ ${message}</span>`
 :
-`<span>${msg}</span>`;
+`<span>${message}</span>`;
 
 }
 
-function esc(s){
 
-return String(s ?? "")
+function clearStatus(element){
+
+if(!element){
+return;
+}
+
+element.classList.remove("show");
+element.innerHTML = "";
+
+}
+
+
+/* =======================================================
+   HTML ESCAPING
+======================================================= */
+
+function esc(value){
+
+return String(value ?? "")
 .replace(
 /[&<>"']/g,
-c =>
+char =>
 ({
 "&":"&amp;",
 "<":"&lt;",
 ">":"&gt;",
 '"':"&quot;",
 "'":"&#039;"
-}[c])
+}[char])
 );
 
 }
 
-/* -------------------------------------------------------
+
+/* =======================================================
+   SAFE URL HANDLING
+======================================================= */
+
+function getSafeUrl(source){
+
+if(!source){
+return "";
+}
+
+const candidates = [
+
+source.metadata?.canonicalUrl,
+
+source.metadata?.finalUrl,
+
+source.canonicalUrl,
+
+source.finalUrl,
+
+source.url
+
+];
+
+for(const candidate of candidates){
+
+if(
+typeof candidate !== "string"
+){
+continue;
+}
+
+const value =
+candidate.trim();
+
+try{
+
+const url =
+new URL(value);
+
+if(
+url.protocol === "http:" ||
+url.protocol === "https:"
+){
+
+return url.href;
+
+}
+
+}
+catch{
+
+/* Ignore invalid URL */
+
+}
+
+}
+
+return "";
+
+}
+
+
+/* =======================================================
+   NORMALIZE SOURCE
+======================================================= */
+
+function normalizeSource(source){
+
+if(!source || typeof source !== "object"){
+return null;
+}
+
+const matchedWords =
+Number.isFinite(
+Number(source.matchedWords)
+)
+?
+Number(source.matchedWords)
+:
+0;
+
+const identicalWords =
+Number.isFinite(
+Number(source.identicalWords)
+)
+?
+Number(source.identicalWords)
+:
+0;
+
+const similarWords =
+Number.isFinite(
+Number(source.similarWords)
+)
+?
+Number(source.similarWords)
+:
+0;
+
+const paraphrasedWords =
+Number.isFinite(
+Number(source.paraphrasedWords)
+)
+?
+Number(source.paraphrasedWords)
+:
+0;
+
+const url =
+getSafeUrl(source);
+
+if(
+!url ||
+matchedWords < MIN_SOURCE_MATCH_WORDS
+){
+
+return null;
+
+}
+
+return {
+
+id:
+String(source.id || url),
+
+title:
+String(
+source.title ||
+source.metadata?.title ||
+new URL(url).hostname
+),
+
+url,
+
+matchedWords,
+
+identicalWords,
+
+similarWords,
+
+paraphrasedWords,
+
+introduction:
+String(source.introduction || "")
+
+};
+
+}
+
+
+/* =======================================================
+   GET VERIFIED SOURCES
+======================================================= */
+
+function getVerifiedSources(results){
+
+if(
+!results ||
+typeof results !== "object"
+){
+
+return [];
+
+}
+
+const internet =
+Array.isArray(results.internet)
+?
+results.internet
+:
+[];
+
+const normalized =
+internet
+.map(normalizeSource)
+.filter(Boolean)
+.sort(
+(a,b) =>
+b.matchedWords -
+a.matchedWords
+);
+
+
+/*
+ * Deduplicate by final URL.
+ */
+
+const unique = [];
+
+const seen = new Set();
+
+for(const source of normalized){
+
+let key =
+source.url
+.toLowerCase()
+.replace(/\/+$/,"");
+
+if(seen.has(key)){
+continue;
+}
+
+seen.add(key);
+
+unique.push(source);
+
+}
+
+return unique.slice(0,20);
+
+}
+
+
+/* =======================================================
    FILE UPLOAD
-------------------------------------------------------- */
+======================================================= */
 
 const fileInput =
 $("#fileInput");
@@ -1907,12 +2241,13 @@ $("#uploadBox");
 const fileName =
 $("#fileName");
 
+
 fileInput.addEventListener(
 "change",
-async e=>{
+async event =>{
 
 const file =
-e.target.files[0];
+event.target.files[0];
 
 if(file){
 
@@ -1923,14 +2258,15 @@ await processFile(file);
 }
 );
 
+
 ["dragenter","dragover"].forEach(
 eventName=>{
 
 uploadBox.addEventListener(
 eventName,
-e=>{
+event=>{
 
-e.preventDefault();
+event.preventDefault();
 
 uploadBox.classList.add("drag");
 
@@ -1940,14 +2276,15 @@ uploadBox.classList.add("drag");
 }
 );
 
+
 ["dragleave","drop"].forEach(
 eventName=>{
 
 uploadBox.addEventListener(
 eventName,
-e=>{
+event=>{
 
-e.preventDefault();
+event.preventDefault();
 
 uploadBox.classList.remove("drag");
 
@@ -1957,12 +2294,13 @@ uploadBox.classList.remove("drag");
 }
 );
 
+
 uploadBox.addEventListener(
 "drop",
-async e=>{
+async event=>{
 
 const file =
-e.dataTransfer.files[0];
+event.dataTransfer.files[0];
 
 if(file){
 
@@ -1972,6 +2310,7 @@ await processFile(file);
 
 }
 );
+
 
 async function processFile(file){
 
@@ -2003,7 +2342,8 @@ $("#plagStatus"),
 '<span class="spinner"></span>Reading your document...'
 );
 
-let text="";
+let text = "";
+
 
 if(name.endsWith(".txt")){
 
@@ -2011,6 +2351,7 @@ text =
 await file.text();
 
 }
+
 
 else if(name.endsWith(".docx")){
 
@@ -2035,12 +2376,14 @@ result.value;
 
 }
 
+
 else if(name.endsWith(".pdf")){
 
 text =
 await extractPdfText(file);
 
 }
+
 
 else{
 
@@ -2050,9 +2393,11 @@ throw new Error(
 
 }
 
+
 text =
 String(text || "")
 .trim();
+
 
 if(!text){
 
@@ -2062,8 +2407,10 @@ throw new Error(
 
 }
 
+
 const words =
 countWords(text);
+
 
 if(words > LIMIT){
 
@@ -2073,12 +2420,14 @@ throw new Error(
 
 }
 
+
 $("#plagText").value =
 text;
 
 $("#plagText").dispatchEvent(
 new Event("input")
 );
+
 
 status(
 $("#plagStatus"),
@@ -2101,6 +2450,11 @@ true
 
 }
 
+
+/* =======================================================
+   PDF EXTRACTION
+======================================================= */
+
 async function extractPdfText(file){
 
 if(!window.pdfjsLib){
@@ -2119,14 +2473,15 @@ await file.arrayBuffer();
 
 const pdf =
 await pdfjsLib.getDocument({
-data:buffer
+data: buffer
 }).promise;
 
-let textParts=[];
+const textParts = [];
+
 
 for(
-let pageNumber=1;
-pageNumber<=pdf.numPages;
+let pageNumber = 1;
+pageNumber <= pdf.numPages;
 pageNumber++
 ){
 
@@ -2138,15 +2493,15 @@ await page.getTextContent();
 
 const pageText =
 content.items
-.map(item=>item.str || "")
+.map(item => item.str || "")
 .join(" ");
 
 textParts.push(pageText);
 
 if(
-countWords(textParts.join(" "))
->
-LIMIT
+countWords(
+textParts.join(" ")
+) > LIMIT
 ){
 
 break;
@@ -2159,12 +2514,14 @@ return textParts.join("\n\n");
 
 }
 
+
 function formatBytes(bytes){
 
-if(bytes === 0)
+if(bytes === 0){
 return "0 Bytes";
+}
 
-const units=[
+const units = [
 "Bytes",
 "KB",
 "MB",
@@ -2188,9 +2545,10 @@ units[i];
 
 }
 
-/* -------------------------------------------------------
+
+/* =======================================================
    PLAGIARISM SCAN
-------------------------------------------------------- */
+======================================================= */
 
 $("#plagBtn").onclick =
 async()=>{
@@ -2203,6 +2561,7 @@ $("#plagText")
 const st =
 $("#plagStatus");
 
+
 if(!text){
 
 return status(
@@ -2213,8 +2572,9 @@ true
 
 }
 
+
 if(
-countWords(text)>LIMIT
+countWords(text) > LIMIT
 ){
 
 return status(
@@ -2225,21 +2585,24 @@ true
 
 }
 
+
 status(
 st,
 '<span class="spinner"></span>Submitting your text for a web plagiarism scan…'
 );
 
-$("#plagBtn").disabled=true;
+
+$("#plagBtn").disabled = true;
 
 $("#plagResults")
 .classList.remove("show");
+
 
 try{
 
 const r =
 await fetch(
-API_BASE+"/api/plagiarism",
+API_BASE + "/api/plagiarism",
 {
 method:"POST",
 headers:{
@@ -2253,8 +2616,23 @@ text
 }
 );
 
-const d =
+
+let d;
+
+try{
+
+d =
 await r.json();
+
+}
+catch{
+
+throw new Error(
+"The plagiarism server returned an invalid response."
+);
+
+}
+
 
 if(!r.ok){
 
@@ -2265,42 +2643,72 @@ d.error ||
 
 }
 
+
+if(!d.scanId){
+
+throw new Error(
+"The plagiarism server did not return a scan ID."
+);
+
+}
+
+
 status(
 st,
 '<span class="spinner"></span>Scan submitted. Searching sources…'
 );
 
-let done=false;
+
+let done = false;
+
 
 for(
-let i=0;
-i<120;
+let i = 0;
+i < 120;
 i++
 ){
 
 await new Promise(
-x=>setTimeout(x,3000)
+resolve =>
+setTimeout(resolve,3000)
 );
+
 
 const q =
 await fetch(
-API_BASE+
-"/api/plagiarism/"+
-encodeURIComponent(d.scanId)+
-"?t="+Date.now(),
+API_BASE +
+"/api/plagiarism/" +
+encodeURIComponent(d.scanId) +
+"?t=" +
+Date.now(),
 {
 cache:"no-store"
 }
 );
 
-const data =
+
+let data;
+
+try{
+
+data =
 await q.json();
+
+}
+catch{
+
+throw new Error(
+"The scan server returned an invalid response."
+);
+
+}
+
 
 if(
 data.status === "completed"
 ){
 
-done=true;
+done = true;
 
 renderPlag(
 data,
@@ -2310,6 +2718,7 @@ d.scanId
 break;
 
 }
+
 
 if(
 data.status === "error"
@@ -2322,6 +2731,7 @@ data.error ||
 
 }
 
+
 status(
 st,
 `<span class="spinner"></span>Scanning… ${Math.min(
@@ -2332,6 +2742,7 @@ Math.round((i+1)/60*100)
 
 }
 
+
 if(!done){
 
 throw new Error(
@@ -2341,13 +2752,16 @@ throw new Error(
 }
 
 }
-catch(e){
+catch(error){
 
-console.error(e);
+console.error(
+"Plagiarism scan:",
+error
+);
 
 status(
 st,
-e.message ||
+error.message ||
 "Plagiarism scan failed.",
 true
 );
@@ -2355,65 +2769,105 @@ true
 }
 finally{
 
-$("#plagBtn")
-.disabled=false;
+$("#plagBtn").disabled = false;
 
 }
 
 };
 
-/* -------------------------------------------------------
-   RENDER RESULTS
-------------------------------------------------------- */
 
-let latestReportData=null;
+/* =======================================================
+   LATEST REPORT DATA
+======================================================= */
+
+let latestReportData = null;
+
+
+/* =======================================================
+   RENDER PLAGIARISM RESULTS
+======================================================= */
 
 function renderPlag(
-d,
+data,
 scanId
 ){
 
-latestReportData =
-{
-...d,
+latestReportData = {
+...data,
 scanId
 };
 
-const r =
-d.results || {};
+
+const results =
+data.results || {};
+
+
+const rawScore =
+Number(
+results.score?.aggregatedScore
+);
+
 
 const score =
-Number(
-r.score?.aggregatedScore || 0
-);
-
-const original =
+Number.isFinite(rawScore)
+?
 Math.max(
 0,
-100-score
+Math.min(100,rawScore)
+)
+:
+0;
+
+
+const originality =
+Math.max(
+0,
+Math.min(100,100-score)
 );
+
 
 const sources =
-Array.isArray(r.internet)
-?
-r.internet.slice(0,20)
-:
-[];
+getVerifiedSources(results);
+
+
+/*
+ * Prefer the API's aggregate counts.
+ * These represent the actual categories
+ * returned by the plagiarism service.
+ */
+
+const identicalWords =
+Number(
+results.score?.identicalWords || 0
+);
+
+const minorChangedWords =
+Number(
+results.score?.minorChangedWords || 0
+);
+
+const relatedMeaningWords =
+Number(
+results.score?.relatedMeaningWords || 0
+);
+
 
 const matchedWords =
-Number(
-(r.score?.identicalWords || 0)
-+
-(r.score?.minorChangedWords || 0)
-+
-(r.score?.relatedMeaningWords || 0)
-);
+identicalWords +
+minorChangedWords +
+relatedMeaningWords;
+
+
+const sourceCount =
+sources.length;
+
 
 $("#plagResults")
 .classList.add("show");
 
+
 $("#plagResults")
-.innerHTML=`
+.innerHTML = `
 
 <div class="scoregrid">
 
@@ -2424,14 +2878,15 @@ Originality
 </small>
 
 <strong class="good">
-${original.toFixed(1)}%
+${originality.toFixed(1)}%
 </strong>
 
 <div class="meter">
-<i style="width:${original}%"></i>
+<i style="width:${originality}%"></i>
 </div>
 
 </div>
+
 
 <div class="metric">
 
@@ -2449,6 +2904,7 @@ ${score.toFixed(1)}%
 
 </div>
 
+
 <div class="metric">
 
 <small>
@@ -2462,6 +2918,29 @@ ${matchedWords.toLocaleString()}
 </div>
 
 </div>
+
+
+<div class="toolbar"
+style="margin-top:18px">
+
+<span>
+Exact: <strong>${identicalWords.toLocaleString()}</strong>
+</span>
+
+<span>
+Minor changes: <strong>${minorChangedWords.toLocaleString()}</strong>
+</span>
+
+<span>
+Related meaning: <strong>${relatedMeaningWords.toLocaleString()}</strong>
+</span>
+
+<span>
+Verified web sources: <strong>${sourceCount}</strong>
+</span>
+
+</div>
+
 
 <div class="report-actions">
 
@@ -2481,93 +2960,152 @@ id="downloadPng"
 
 </div>
 
+
 <div class="sources">
 
 <h3>
 ${
 sources.length
 ?
-"Detected Sources"
+"Verified Web Sources"
 :
-"No web matches returned"
+"No Verified Web Sources"
 }
 </h3>
 
+
 ${
+sources.length
+?
+
 sources
 .map(
-s=>
-`
+source => `
+
 <div class="source">
 
-<div>
+<div class="source-main">
 
 <a
-href="${esc(s.url)}"
+href="${esc(source.url)}"
 target="_blank"
-rel="noopener"
+rel="noopener noreferrer nofollow"
 >
-${esc(
-s.title ||
-s.url ||
-"Source"
-)}
+${esc(source.title)}
 </a>
 
-<br>
+<div class="match-details">
 
-<small>
-${Number(
-s.matchedWords || 0
-).toLocaleString()}
-matched words
-</small>
-
-</div>
-
-<span
-class="source-url"
->
-${esc(
-s.url || ""
-)}
+<span>
+${source.matchedWords.toLocaleString()} matched words
 </span>
 
-</div>
-`
-)
-.join("")
+${
+source.identicalWords
+?
+`<span>Exact: ${source.identicalWords}</span>`
+:
+""
+}
+
+${
+source.similarWords
+?
+`<span>Similar: ${source.similarWords}</span>`
+:
+""
+}
+
+${
+source.paraphrasedWords
+?
+`<span>Paraphrased: ${source.paraphrasedWords}</span>`
+:
+""
 }
 
 </div>
 
-<div class="notice">
-
-Powered by the connected plagiarism service.
-Similarity results are indicators of matching content.
-Review every source before making an academic or legal conclusion.
+<span class="source-url">
+${esc(source.url)}
+</span>
 
 </div>
+
+<span class="source-badge">
+${source.matchedWords} MATCHED
+</span>
+
+</div>
+
+`
+)
+.join("")
+
+:
+
+`
+<div class="empty-source">
+
+<strong>No verified source passed the source-quality filter.</strong>
+
+<br><br>
+
+DPT-Detector hides very small matches such as
+1–4 matched words because common words or short phrases
+can occur naturally across unrelated websites.
+
+This does <strong>not</strong> mean the document is guaranteed
+to be plagiarism-free. It means no sufficiently strong
+web source was returned by the connected detection service.
+
+</div>
+`
+
+}
+
+</div>
+
+
+<div class="notice">
+
+<strong>How to interpret this result:</strong>
+
+The similarity percentage comes from the connected
+plagiarism-detection service. DPT-Detector does not invent
+source URLs. A source is displayed only when the service
+returns a valid web URL and at least
+${MIN_SOURCE_MATCH_WORDS} matched words.
+
+Review the highlighted source content before making
+academic or legal conclusions.
+
+</div>
+
 `;
+
 
 $("#downloadPdf")
 .onclick =
 ()=>generateReport("pdf");
 
+
 $("#downloadPng")
 .onclick =
 ()=>generateReport("png");
 
+
 status(
 $("#plagStatus"),
-"✓ Scan completed successfully."
+"✓ Scan completed. Weak source matches have been filtered."
 );
 
 }
 
-/* -------------------------------------------------------
-   REPORT DATA
-------------------------------------------------------- */
+
+/* =======================================================
+   REPORT PREPARATION
+======================================================= */
 
 function prepareReport(){
 
@@ -2579,38 +3117,65 @@ throw new Error(
 
 }
 
-const d =
+
+const data =
 latestReportData;
 
-const r =
-d.results || {};
+const results =
+data.results || {};
+
+
+const rawScore =
+Number(
+results.score?.aggregatedScore
+);
+
 
 const score =
-Number(
-r.score?.aggregatedScore || 0
-);
+Number.isFinite(rawScore)
+?
+Math.max(
+0,
+Math.min(100,rawScore)
+)
+:
+0;
+
 
 const originality =
 Math.max(
 0,
-100-score
+Math.min(100,100-score)
 );
+
+
+const identicalWords =
+Number(
+results.score?.identicalWords || 0
+);
+
+
+const minorChangedWords =
+Number(
+results.score?.minorChangedWords || 0
+);
+
+
+const relatedMeaningWords =
+Number(
+results.score?.relatedMeaningWords || 0
+);
+
 
 const matched =
-Number(
-(r.score?.identicalWords || 0)
-+
-(r.score?.minorChangedWords || 0)
-+
-(r.score?.relatedMeaningWords || 0)
-);
+identicalWords +
+minorChangedWords +
+relatedMeaningWords;
+
 
 const sources =
-Array.isArray(r.internet)
-?
-r.internet.slice(0,20)
-:
-[];
+getVerifiedSources(results);
+
 
 $("#reportFile")
 .textContent =
@@ -2620,67 +3185,88 @@ fileName.textContent
 ||
 "Text submission";
 
+
 $("#reportScanId")
 .textContent =
-d.scanId || "-";
+data.scanId || "-";
+
 
 $("#reportDate")
 .textContent =
 new Date().toLocaleString();
 
+
 $("#reportOriginality")
 .textContent =
-originality.toFixed(1)+"%";
+originality.toFixed(1) + "%";
+
 
 $("#reportSimilarity")
 .textContent =
-score.toFixed(1)+"%";
+score.toFixed(1) + "%";
+
 
 $("#reportMatched")
 .textContent =
 matched.toLocaleString();
 
+
 $("#reportSources")
 .innerHTML =
 sources.length
 ?
-sources.map(
-s=>
-`
+
+sources
+.map(
+source => `
+
 <div class="report-source">
 
 <strong>
-${esc(
-s.title ||
-s.url ||
-"Detected source"
-)}
+${esc(source.title)}
 </strong>
 
 <span>
 Matched words:
-${Number(
-s.matchedWords || 0
-).toLocaleString()}
+${source.matchedWords.toLocaleString()}
 </span>
 
 <br>
 
 <span>
-${esc(
-s.url || ""
-)}
+Exact:
+${source.identicalWords}
+•
+Similar:
+${source.similarWords}
+•
+Paraphrased:
+${source.paraphrasedWords}
+</span>
+
+<br>
+
+<span>
+${esc(source.url)}
 </span>
 
 </div>
+
 `
-).join("")
+)
+.join("")
+
 :
+
 `
 <div class="report-source">
-No web matches were returned.
+
+No verified web sources passed the
+${MIN_SOURCE_MATCH_WORDS}-word source filter.
+
 </div>
 `;
+
 
 return {
 score,
@@ -2691,22 +3277,23 @@ sources
 
 }
 
-/* -------------------------------------------------------
-   GENERATE REPORT
-------------------------------------------------------- */
 
-async function generateReport(
-type
-){
+/* =======================================================
+   GENERATE REPORT
+======================================================= */
+
+async function generateReport(type){
 
 const loading =
 $("#reportLoading");
 
 loading.classList.add("show");
 
+
 try{
 
 prepareReport();
+
 
 await new Promise(
 resolve =>
@@ -2715,8 +3302,10 @@ requestAnimationFrame(
 )
 );
 
+
 const element =
 $("#reportTemplate");
+
 
 const canvas =
 await html2canvas(
@@ -2729,10 +3318,12 @@ logging:false
 }
 );
 
+
 const filename =
 `DPT-Detector-Plagiarism-Report-${new Date()
 .toISOString()
 .slice(0,10)}`;
+
 
 if(type === "png"){
 
@@ -2740,7 +3331,7 @@ const link =
 document.createElement("a");
 
 link.download =
-filename+".png";
+filename + ".png";
 
 link.href =
 canvas.toDataURL(
@@ -2751,13 +3342,13 @@ canvas.toDataURL(
 link.click();
 
 }
-
 else{
 
 const {
 jsPDF
 } =
 window.jspdf;
+
 
 const pdf =
 new jsPDF(
@@ -2768,10 +3359,12 @@ format:"a4"
 }
 );
 
+
 const imgData =
 canvas.toDataURL(
 "image/png"
 );
+
 
 const pageWidth =
 pdf.internal.pageSize.getWidth();
@@ -2779,11 +3372,11 @@ pdf.internal.pageSize.getWidth();
 const pageHeight =
 pdf.internal.pageSize.getHeight();
 
-const margin=8;
+const margin = 8;
 
 const availableWidth =
 pageWidth -
-margin*2;
+margin * 2;
 
 const ratio =
 canvas.height /
@@ -2793,9 +3386,10 @@ const imageHeight =
 availableWidth *
 ratio;
 
+
 if(
 imageHeight <=
-pageHeight-margin*2
+pageHeight - margin * 2
 ){
 
 pdf.addImage(
@@ -2808,13 +3402,14 @@ imageHeight
 );
 
 }
-
 else{
 
 let remaining =
 imageHeight;
 
-let position=margin;
+let position =
+margin;
+
 
 pdf.addImage(
 imgData,
@@ -2825,8 +3420,11 @@ availableWidth,
 imageHeight
 );
 
+
 remaining -=
-pageHeight-margin*2;
+pageHeight -
+margin * 2;
+
 
 while(
 remaining > 0
@@ -2835,8 +3433,8 @@ remaining > 0
 pdf.addPage();
 
 position =
--(imageHeight -
-remaining);
+-(imageHeight - remaining);
+
 
 pdf.addImage(
 imgData,
@@ -2847,6 +3445,7 @@ availableWidth,
 imageHeight
 );
 
+
 remaining -=
 pageHeight;
 
@@ -2854,8 +3453,9 @@ pageHeight;
 
 }
 
+
 pdf.save(
-filename+".pdf"
+filename + ".pdf"
 );
 
 }
@@ -2875,48 +3475,49 @@ alert(
 }
 finally{
 
-loading.classList.remove(
-"show"
-);
+loading.classList.remove("show");
 
 }
 
 }
 
-/* -------------------------------------------------------
-   CLEAR
-------------------------------------------------------- */
+
+/* =======================================================
+   CLEAR PLAGIARISM
+======================================================= */
 
 $("#plagClear")
-.onclick=()=>{
+.onclick = ()=>{
 
-$("#plagText").value="";
+$("#plagText").value = "";
 
 $("#plagResults")
 .classList.remove("show");
 
+clearStatus(
 $("#plagStatus")
-.classList.remove("show");
+);
 
 $("#plagCount")
 .textContent =
 "0 words • 0 characters";
 
-fileInput.value="";
+fileInput.value = "";
 
 fileName.textContent =
 "No file selected";
 
-latestReportData=null;
+latestReportData = null;
 
 };
 
-/* -------------------------------------------------------
+
+/* =======================================================
    REWRITE
-------------------------------------------------------- */
+======================================================= */
 
 $("#rewriteBtn")
-.onclick=async()=>{
+.onclick = async()=>{
 
 const text =
 $("#rewriteInput")
@@ -2925,6 +3526,7 @@ $("#rewriteInput")
 
 const st =
 $("#rewriteStatus");
+
 
 if(!text){
 
@@ -2936,8 +3538,9 @@ true
 
 }
 
+
 if(
-countWords(text)>LIMIT
+countWords(text) > LIMIT
 ){
 
 return status(
@@ -2948,19 +3551,22 @@ true
 
 }
 
+
 status(
 st,
 '<span class="spinner"></span>Rewriting your text…'
 );
 
+
 $("#rewriteBtn")
-.disabled=true;
+.disabled = true;
+
 
 try{
 
 const r =
 await fetch(
-API_BASE+"/api/rewrite",
+API_BASE + "/api/rewrite",
 {
 method:"POST",
 headers:{
@@ -2976,21 +3582,38 @@ $("#style").value
 }
 );
 
-const d =
+
+let data;
+
+try{
+
+data =
 await r.json();
+
+}
+catch{
+
+throw new Error(
+"The rewrite server returned an invalid response."
+);
+
+}
+
 
 if(!r.ok){
 
 throw new Error(
-d.error ||
+data.error ||
 "Rewrite failed."
 );
 
 }
 
+
 $("#rewriteOutput")
 .value =
-d.text;
+data.text || "";
+
 
 status(
 st,
@@ -2998,11 +3621,11 @@ st,
 );
 
 }
-catch(e){
+catch(error){
 
 status(
 st,
-e.message ||
+error.message ||
 "Rewrite failed.",
 true
 );
@@ -3011,35 +3634,62 @@ true
 finally{
 
 $("#rewriteBtn")
-.disabled=false;
+.disabled = false;
 
 }
 
 };
 
-$("#copyRewrite")
-.onclick=async()=>{
 
-await navigator.clipboard.writeText(
-$("#rewriteOutput").value
+$("#copyRewrite")
+.onclick = async()=>{
+
+const text =
+$("#rewriteOutput").value;
+
+if(!text){
+
+return status(
+$("#rewriteStatus"),
+"No rewritten text to copy.",
+true
 );
+
+}
+
+try{
+
+await navigator.clipboard.writeText(text);
 
 status(
 $("#rewriteStatus"),
 "✓ Copied to clipboard."
 );
 
+}
+catch{
+
+status(
+$("#rewriteStatus"),
+"Could not copy automatically. Please select and copy the text.",
+true
+);
+
+}
+
 };
 
+
 $("#rewriteClear")
-.onclick=()=>{
+.onclick = ()=>{
 
-$("#rewriteInput").value="";
+$("#rewriteInput").value = "";
 
-$("#rewriteOutput").value="";
+$("#rewriteOutput").value = "";
 
+clearStatus(
 $("#rewriteStatus")
-.classList.remove("show");
+);
 
 $("#rewriteCount")
 .textContent =
@@ -3047,19 +3697,21 @@ $("#rewriteCount")
 
 };
 
-/* -------------------------------------------------------
+
+/* =======================================================
    READABILITY
-------------------------------------------------------- */
+======================================================= */
 
 $("#readBtn")
-.onclick=()=>{
+.onclick = ()=>{
 
-const t =
+const text =
 $("#readInput")
 .value
 .trim();
 
-if(!t){
+
+if(!text){
 
 $("#readResults")
 .innerHTML =
@@ -3069,27 +3721,35 @@ return;
 
 }
 
-const words =
-countWords(t);
 
-const sent =
+const words =
+countWords(text);
+
+
+const sentences =
 Math.max(
 1,
-(t.match(/[.!?]+/g)||[]).length
+(text.match(/[.!?]+/g) || []).length
 );
 
+
 const chars =
-t.length;
+text.length;
 
-const avg =
-words/sent;
 
-const syll =
+const average =
+words /
+sentences;
+
+
+const syllables =
 (
-t
+text
 .toLowerCase()
-.match(/[aeiouy]+/g)||[]
+.match(/[aeiouy]+/g)
+|| []
 ).length;
+
 
 const score =
 Math.max(
@@ -3097,40 +3757,46 @@ Math.max(
 Math.min(
 100,
 206.835
--1.015*avg
--84.6*(syll/Math.max(1,words))
+-1.015 * average
+-84.6 *
+(
+syllables /
+Math.max(1,words)
+)
 )
 );
 
+
 const level =
-score>=90
+score >= 90
 ?
 "Very easy"
 :
-score>=80
+score >= 80
 ?
 "Easy"
 :
-score>=70
+score >= 70
 ?
 "Fairly easy"
 :
-score>=60
+score >= 60
 ?
 "Standard"
 :
-score>=50
+score >= 50
 ?
 "Fairly difficult"
 :
-score>=30
+score >= 30
 ?
 "Difficult"
 :
 "Very difficult";
 
+
 $("#readResults")
-.innerHTML=`
+.innerHTML = `
 
 <div class="scoregrid">
 
@@ -3146,6 +3812,7 @@ ${score.toFixed(0)}/100
 
 </div>
 
+
 <div class="metric">
 
 <small>
@@ -3158,6 +3825,7 @@ ${level}
 
 </div>
 
+
 <div class="metric">
 
 <small>
@@ -3165,18 +3833,19 @@ Words / sentence
 </small>
 
 <strong>
-${avg.toFixed(1)}
+${average.toFixed(1)}
 </strong>
 
 </div>
 
 </div>
 
+
 <div class="notice">
 
 ${words.toLocaleString()}
 words •
-${sent}
+${sentences}
 sentences •
 ${chars.toLocaleString()}
 characters.
@@ -3184,17 +3853,19 @@ characters.
 Readability scores are estimates.
 
 </div>
+
 `;
 
 };
 
-$("#readClear")
-.onclick=()=>{
 
-$("#readInput").value="";
+$("#readClear")
+.onclick = ()=>{
+
+$("#readInput").value = "";
 
 $("#readResults")
-.innerHTML="";
+.innerHTML = "";
 
 $("#readCount")
 .textContent =
@@ -3202,62 +3873,111 @@ $("#readCount")
 
 };
 
-/* -------------------------------------------------------
+
+/* =======================================================
    WRITING TOOLS
-------------------------------------------------------- */
+======================================================= */
 
 $$("[data-action]")
 .forEach(
-b=>
-b.onclick=async()=>{
+button =>
 
-const t =
+button.onclick = async()=>{
+
+const textarea =
 $("#writeInput");
 
-const a =
-b.dataset.action;
+const action =
+button.dataset.action;
 
-if(a==="upper")
-t.value =
-t.value.toUpperCase();
 
-if(a==="lower")
-t.value =
-t.value.toLowerCase();
+if(action === "upper"){
 
-if(a==="clean")
-t.value =
-t.value
+textarea.value =
+textarea.value.toUpperCase();
+
+}
+
+
+if(action === "lower"){
+
+textarea.value =
+textarea.value.toLowerCase();
+
+}
+
+
+if(action === "clean"){
+
+textarea.value =
+textarea.value
 .replace(/\s+/g," ")
 .trim();
 
-if(a==="copy"){
+}
 
-await navigator.clipboard
-.writeText(t.value);
+
+if(action === "copy"){
+
+if(!textarea.value){
+
+return status(
+$("#writeStatus"),
+"No text to copy.",
+true
+);
+
+}
+
+try{
+
+await navigator.clipboard.writeText(
+textarea.value
+);
 
 status(
 $("#writeStatus"),
 "✓ Copied to clipboard."
 );
 
-return;
-
 }
-
-if(a==="clear")
-t.value="";
-
-if(a==="count"){
+catch{
 
 status(
 $("#writeStatus"),
-`Words: ${countWords(t.value).toLocaleString()} • Characters: ${t.value.length.toLocaleString()} • Sentences: ${(t.value.match(/[.!?]+/g)||[]).length}`
+"Could not copy automatically.",
+true
 );
 
 }
 
-t.dispatchEvent(
+return;
+
+}
+
+
+if(action === "clear"){
+
+textarea.value = "";
+
+clearStatus(
+$("#writeStatus")
+);
+
+}
+
+
+if(action === "count"){
+
+status(
+$("#writeStatus"),
+`Words: ${countWords(textarea.value).toLocaleString()} • Characters: ${textarea.value.length.toLocaleString()} • Sentences: ${(textarea.value.match(/[.!?]+/g)||[]).length}`
+);
+
+}
+
+
+textarea.dispatchEvent(
 new Event("input")
 );
 
