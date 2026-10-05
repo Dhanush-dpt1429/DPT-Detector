@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import crypto from "node:crypto";
+import crypto from "node:crypto";\nimport { readFileSync } from "node:fs";
 import "dotenv/config";
 
 const app = express();
