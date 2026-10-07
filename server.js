@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import crypto from "node:crypto";
+import { readFileSync } from "node:fs";
 import "dotenv/config";
 
 const app = express();
@@ -19,6 +20,8 @@ app.use(
   })
 );
 
+app.options("*", cors());
+
 const PORT =
   Number(process.env.PORT || 8787);
 
@@ -28,9 +31,17 @@ const MAX_WORDS = 5000;
    SERVE FRONTEND
 ------------------------------------------------------- */
 
+app.get("/favicon.ico", (req, res) => res.status(204).end());
+
 app.get("/", (req, res) => {
   res.set("Cache-Control", "no-store");
-  res.sendFile(new URL("./index.html", import.meta.url).pathname);
+  try {
+    const html = readFileSync(new URL("./index.html", import.meta.url), "utf8");
+    res.type("html").send(html);
+  } catch (error) {
+    console.error("Frontend serving error:", error);
+    res.status(500).type("text").send("DPT-Detector frontend could not be loaded.");
+  }
 });
 
 /*
@@ -1248,7 +1259,7 @@ app.post(
 
       const model =
         process.env.GEMINI_MODEL ||
-        "gemini-3.6-flash";
+        "gemini-2.5-flash";
 
       const prompt = `
 You are DPT-Detector's writing improvement engine.
