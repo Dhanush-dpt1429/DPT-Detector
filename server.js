@@ -681,7 +681,10 @@ app.post(
               true,
 
             relatedMeaningEnabled:
-              true
+              true,
+
+            minCopiedWords:
+              MIN_MATCH_WORDS
           },
 
           sandbox,
