@@ -17,10 +17,11 @@ app.use(
       FRONTEND_ORIGIN === "*"
         ? true
         : FRONTEND_ORIGIN,
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
-app.options("*", cors());
 
 const PORT =
   Number(process.env.PORT || 8787);
