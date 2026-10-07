@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import crypto from "node:crypto";\nimport { readFileSync } from "node:fs";
+import crypto from "node:crypto";
 import "dotenv/config";
 
 const app = express();
@@ -23,6 +23,15 @@ const PORT =
   Number(process.env.PORT || 8787);
 
 const MAX_WORDS = 5000;
+
+/* -------------------------------------------------------
+   SERVE FRONTEND
+------------------------------------------------------- */
+
+app.get("/", (req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.sendFile(new URL("./index.html", import.meta.url).pathname);
+});
 
 /*
 =======================================================
